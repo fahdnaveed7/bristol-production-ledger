@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Served from GitHub Pages under /bristol-production-ledger/; dev stays at /
+  base: typeof process !== 'undefined' && process.env.GITHUB_ACTIONS ? '/bristol-production-ledger/' : '/',
   plugins: [
     react(),
     VitePWA({
