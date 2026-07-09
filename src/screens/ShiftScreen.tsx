@@ -62,7 +62,8 @@ export function ShiftScreen() {
     setBusy(true)
     setMsg(null)
     try {
-      await closeShift(shift, profile!.id)
+      // Leave the report unverified — QC (or a manager) verifies it separately in Reports.
+      await closeShift(shift, null)
       await reload()
       setConfirmClose(false)
       setMsg('Shift closed — report frozen. Next shift opens with this closing balance.')
