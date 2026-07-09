@@ -82,10 +82,10 @@ export function Dashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <Stat label="Started with" value={kg(shift.opening_balance_kg)} hint="kg in store" />
+            <Stat label="Opened with" value={kg(shift.opening_balance_kg)} hint="kg infeed area" />
             <Stat label="Trucks brought" value={kg(totals?.received_kg)} hint="kg" />
             <Stat label="Fed to plant" value={kg(totals?.fed_kg)} hint="kg" />
-            <Stat label="In store now" value={kg(totals?.closing_balance_kg)} hint="kg" accent />
+            <Stat label="Infeed area now" value={kg(totals?.closing_balance_kg)} hint="kg" accent />
           </div>
 
           <div className="card p-4 mb-4">

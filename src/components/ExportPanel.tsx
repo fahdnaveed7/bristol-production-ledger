@@ -7,9 +7,10 @@ import {
   exportShiftReports,
   type DateRange,
 } from '../lib/export'
+import { exportExcelWorkbook } from '../lib/excel'
 import { Notice } from './ui'
 
-type Key = 'reports' | 'intake' | 'production' | 'pricing'
+type Key = 'excel' | 'reports' | 'intake' | 'production' | 'pricing'
 
 const DATASETS: { key: Key; label: string; hint: string; run: (r: DateRange) => Promise<{ rows: number; csv: string }>; file: string }[] = [
   { key: 'reports', label: 'Shift reports', hint: 'Frozen per-shift production summaries + yields', run: exportShiftReports, file: 'shift-reports' },
@@ -57,6 +58,28 @@ export function ExportPanel() {
         </div>
       </div>
 
+      {/* The headline export: one formatted workbook with everything */}
+      <button
+        className="btn-primary w-full flex-col items-start text-left py-3 h-auto mb-3"
+        disabled={busy != null}
+        onClick={async () => {
+          setBusy('excel')
+          setMsg(null)
+          try {
+            await exportExcelWorkbook(range)
+            setMsg({ tone: 'success', text: 'Excel workbook downloaded — 5 formatted sheets: shift reports, trucks, production, stock register, pricing.' })
+          } catch (e) {
+            setMsg({ tone: 'error', text: (e as Error).message })
+          } finally {
+            setBusy(null)
+          }
+        }}
+      >
+        <span className="font-bold">{busy === 'excel' ? 'Building workbook…' : '⬇ Full Excel workbook (.xlsx)'}</span>
+        <span className="text-xs font-normal opacity-80">Everything in one formatted file — shift reports, trucks, production, stock register, pricing</span>
+      </button>
+
+      <p className="label">Or single files (CSV)</p>
       <div className="grid sm:grid-cols-2 gap-2">
         {DATASETS.map((d) => (
           <button key={d.key} className="btn-ghost flex-col items-start text-left py-3 h-auto" onClick={() => run(d)} disabled={busy != null}>

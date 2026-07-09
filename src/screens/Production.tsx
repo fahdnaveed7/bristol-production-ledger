@@ -31,15 +31,17 @@ export function Production() {
 
   return (
     <>
-      <PageHeader title="Production" subtitle="Feed fish in, record bags out" />
+      <PageHeader title="Production" subtitle="Feed the plant, then record fishmeal and oil as they come out" />
 
       <ShiftBanner shift={shift} reload={reload} canControl={canControl} />
 
       {shift && (
         <>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <FeedForm shiftId={shift.id} profileId={profile!.id} nextNo={batches.length + 1} />
-            <OutputForm latestBatch={batches[0] ?? null} />
+          <FeedForm shiftId={shift.id} profileId={profile!.id} nextNo={batches.length + 1} />
+
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            <MealOutForm latestBatch={batches[0] ?? null} />
+            <OilOutForm latestBatch={batches[0] ?? null} />
           </div>
 
           <ShiftLog batches={batches} outputs={outputs} />
@@ -81,12 +83,18 @@ function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: 
   return (
     <div className="card p-4">
       <h2 className="font-bold text-gray-900 mb-1">⬇ Fish into the plant</h2>
-      <p className="text-xs text-gray-500 mb-3">Each entry is numbered automatically (next: B-{nextNo})</p>
-      <label className="label">Kg fed</label>
-      <input className="field num text-xl mb-2" value={fed} onChange={(e) => setFed(e.target.value)} inputMode="decimal" placeholder="15000" />
-      <label className="label">Fish type (optional)</label>
-      <input className="field mb-3" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sardine" />
-      <button className="btn-primary w-full" onClick={submit} disabled={busy}>
+      <p className="text-xs text-gray-500 mb-3">From the infeed area. Each feed is numbered automatically (next: B-{nextNo})</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Kg fed</label>
+          <input className="field num text-xl" value={fed} onChange={(e) => setFed(e.target.value)} inputMode="decimal" placeholder="15000" />
+        </div>
+        <div>
+          <label className="label">Fish type (optional)</label>
+          <input className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sardine" />
+        </div>
+      </div>
+      <button className="btn-primary w-full mt-3" onClick={submit} disabled={busy}>
         {busy ? 'Saving…' : 'Record feed'}
       </button>
       {msg && <p className="text-xs text-amber-700 mt-2">{msg}</p>}
@@ -94,65 +102,57 @@ function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: 
   )
 }
 
-function OutputForm({ latestBatch }: { latestBatch: Batch | null }) {
-  const [product, setProduct] = useState<Product>('fishmeal')
-  const [mode, setMode] = useState<'bags' | 'kg'>('bags')
-  const [bags, setBags] = useState('')
-  const [perBag, setPerBag] = useState('50')
-  const [totalKg, setTotalKg] = useState('')
+// Shared submit plumbing for the two output cards.
+function useOutputSubmit(latestBatch: Batch | null, product: Product) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const liveKg = mode === 'bags' ? (Number(bags) || 0) * (Number(perBag) || 0) : Number(totalKg) || 0
-
-  async function submit() {
+  async function submit(vals: { bags: number | null; kg_per_bag: number | null; total_kg: number }) {
     setMsg(null)
     if (!latestBatch) return
-    if (liveKg <= 0) return setMsg(mode === 'bags' ? 'How many bags?' : 'How many kg?')
     setBusy(true)
     try {
       const { queued } = await addOutput({
-        batch_id: latestBatch.id, // product comes out of the most recent feed
+        batch_id: latestBatch.id, // product counts against the most recent feed
         product,
-        bags: mode === 'bags' ? Number(bags) : null,
-        kg_per_bag: mode === 'bags' ? Number(perBag) : null,
-        total_kg: liveKg,
+        bags: vals.bags,
+        kg_per_bag: vals.kg_per_bag,
+        total_kg: vals.total_kg,
       })
-      setBags('')
-      setTotalKg('')
-      setMsg(queued ? 'Saved on this device — will send when internet is back' : null)
+      setMsg(queued ? 'Saved on this device — will send when internet is back' : 'Added to stock ✓')
     } catch (e) {
       setMsg((e as Error).message)
     } finally {
       setBusy(false)
     }
   }
+  return { busy, msg, setMsg, submit }
+}
+
+function MealOutForm({ latestBatch }: { latestBatch: Batch | null }) {
+  const [mode, setMode] = useState<'bags' | 'kg'>('bags')
+  const [bags, setBags] = useState('')
+  const [perBag, setPerBag] = useState('50')
+  const [totalKg, setTotalKg] = useState('')
+  const { busy, msg, setMsg, submit } = useOutputSubmit(latestBatch, 'fishmeal')
+
+  const liveKg = mode === 'bags' ? (Number(bags) || 0) * (Number(perBag) || 0) : Number(totalKg) || 0
+
+  async function onSave() {
+    if (liveKg <= 0) return setMsg(mode === 'bags' ? 'How many bags?' : 'How many kg?')
+    await submit({
+      bags: mode === 'bags' ? Number(bags) : null,
+      kg_per_bag: mode === 'bags' ? Number(perBag) : null,
+      total_kg: liveKg,
+    })
+    setBags('')
+    setTotalKg('')
+  }
 
   return (
     <div className="card p-4">
-      <h2 className="font-bold text-gray-900 mb-1">⬆ Product out</h2>
-      <p className="text-xs text-gray-500 mb-3">
-        {latestBatch ? `Counts against feed ${latestBatch.batch_no}` : 'Record a feed first — then log what comes out'}
-      </p>
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div>
-          <label className="label">Product</label>
-          <select className="field py-2" value={product} onChange={(e) => setProduct(e.target.value as Product)}>
-            {ACTIVE_PRODUCTS.map((p) => (
-              <option key={p} value={p}>
-                {PRODUCT_LABEL[p]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Counted as</label>
-          <select className="field py-2" value={mode} onChange={(e) => setMode(e.target.value as 'bags' | 'kg')}>
-            <option value="bags">Bags</option>
-            <option value="kg">Kg</option>
-          </select>
-        </div>
-      </div>
+      <h2 className="font-bold text-gray-900 mb-1">⬆ Fishmeal out</h2>
+      <p className="text-xs text-gray-500 mb-3">Bags go straight into the stock register</p>
       {mode === 'bags' ? (
         <div className="grid grid-cols-2 gap-2 mb-2">
           <div>
@@ -173,15 +173,52 @@ function OutputForm({ latestBatch }: { latestBatch: Batch | null }) {
           <input className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" />
         </div>
       )}
+      <button className="text-xs text-gray-400 underline mb-2" onClick={() => setMode(mode === 'bags' ? 'kg' : 'bags')}>
+        {mode === 'bags' ? 'Count in kg instead' : 'Count in bags instead'}
+      </button>
       {liveKg > 0 && (
         <p className="text-sm text-gray-700 mb-2">
-          = <span className="num font-bold text-navy">{kg(liveKg)} kg</span> {PRODUCT_LABEL[product].split(' ')[0].toLowerCase()}
+          = <span className="num font-bold text-navy">{kg(liveKg)} kg</span> fishmeal
         </p>
       )}
-      <button className="btn-primary w-full" onClick={submit} disabled={busy || !latestBatch}>
-        {busy ? 'Saving…' : 'Record output'}
+      <button className="btn-primary w-full" onClick={onSave} disabled={busy || !latestBatch}>
+        {busy ? 'Saving…' : 'Record fishmeal'}
       </button>
-      {msg && <p className="text-xs text-amber-700 mt-2">{msg}</p>}
+      {!latestBatch && <p className="text-xs text-gray-400 mt-2">Record a feed first</p>}
+      {msg && <p className={`text-xs mt-2 ${msg.includes('✓') ? 'text-green-700' : 'text-amber-700'}`}>{msg}</p>}
+    </div>
+  )
+}
+
+function OilOutForm({ latestBatch }: { latestBatch: Batch | null }) {
+  const [totalKg, setTotalKg] = useState('')
+  const { busy, msg, setMsg, submit } = useOutputSubmit(latestBatch, 'fishoil')
+  const liveKg = Number(totalKg) || 0
+
+  async function onSave() {
+    if (liveKg <= 0) return setMsg('How many kg of oil?')
+    await submit({ bags: null, kg_per_bag: null, total_kg: liveKg })
+    setTotalKg('')
+  }
+
+  return (
+    <div className="card p-4">
+      <h2 className="font-bold text-gray-900 mb-1">⬆ Fish oil out</h2>
+      <p className="text-xs text-gray-500 mb-3">Measured in kg, goes into the stock register</p>
+      <div className="mb-2">
+        <label className="label">Kg of oil</label>
+        <input className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" placeholder="750" />
+      </div>
+      {liveKg > 0 && (
+        <p className="text-sm text-gray-700 mb-2">
+          = <span className="num font-bold text-navy">{kg(liveKg)} kg</span> fish oil
+        </p>
+      )}
+      <button className="btn-primary w-full" onClick={onSave} disabled={busy || !latestBatch}>
+        {busy ? 'Saving…' : 'Record fish oil'}
+      </button>
+      {!latestBatch && <p className="text-xs text-gray-400 mt-2">Record a feed first</p>}
+      {msg && <p className={`text-xs mt-2 ${msg.includes('✓') ? 'text-green-700' : 'text-amber-700'}`}>{msg}</p>}
     </div>
   )
 }

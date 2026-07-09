@@ -70,13 +70,19 @@ everything. No service key is ever shipped to the browser.
 
 ## Roles & screens
 
-| Role         | Screens                                              |
-|--------------|-----------------------------------------------------|
-| weighbridge  | Weighbridge                                         |
-| receiving    | Receiving                                           |
-| production   | Production, Shift                                   |
-| qc           | Reports                                             |
-| manager      | everything (incl. Dashboard, Team, rate entry)      |
+| Role         | Screens                                                        |
+|--------------|----------------------------------------------------------------|
+| weighbridge  | Trucks (steps ① weigh loaded, ③ weigh empty, ④ confirm)        |
+| receiving    | Trucks (step ② count & sample boxes)                           |
+| production   | Production (start/end shift, feed in, meal + oil out), Stock   |
+| qc           | Stock, Reports (verify locked shift reports)                   |
+| manager      | everything (incl. Dashboard, Team, rate entry, Excel export)   |
+
+Each truck is one card with a visible 4-step journey; if it's not your team's turn the card says
+who it's waiting for. Shift start/end lives in a banner on the work screens. Production output
+(fishmeal bags, fish oil kg) lands automatically in the **Stock register**, dated by production
+day. The manager Dashboard exports a formatted multi-sheet **Excel workbook** (shift reports,
+trucks, production, stock register, pricing) plus single CSVs.
 
 People may hold several roles; a manager can do everything. Nav shows only the current role's
 screens. The security gate is off-app (paper register).

@@ -69,8 +69,8 @@ export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null
         {canControl ? (
           <>
             <p className="text-sm text-gray-600 mb-3">
-              Start one to begin recording. It will open with{' '}
-              <span className="num font-semibold">{kg(lastClosing)} kg</span> in store (carried from the last shift).
+              Start one to begin recording. The infeed area opens with{' '}
+              <span className="num font-semibold">{kg(lastClosing)} kg</span> (carried from the last shift).
             </p>
             <div className="flex flex-wrap items-end gap-2">
               <div>
@@ -117,17 +117,17 @@ export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null
       {/* The one number everyone cares about, plus the equation behind it */}
       <div className="mt-3 flex items-baseline gap-2">
         <span className="num text-3xl font-bold text-navy">{kg(t?.closing_balance_kg)}</span>
-        <span className="text-sm text-gray-500">kg fish in store right now</span>
+        <span className="text-sm text-gray-500">kg in the infeed area</span>
       </div>
       <p className="text-xs text-gray-400 num mt-1">
-        started with {kg(shift.opening_balance_kg)} + trucks brought {kg(t?.received_kg)} − fed to plant {kg(t?.fed_kg)}
+        opened with {kg(shift.opening_balance_kg)} + trucks brought {kg(t?.received_kg)} − fed to plant {kg(t?.fed_kg)}
       </p>
 
       {ending && (
         <div className="mt-3 rounded-md border border-red-200 bg-red-50/50 p-3">
           <p className="text-sm text-gray-700 mb-2">
-            Ending the shift saves today's report and <b>locks it</b> — later edits won't change it. The{' '}
-            <span className="num font-semibold">{kg(t?.closing_balance_kg)} kg</span> in store carries to the next shift.
+            Ending the shift saves the report and <b>locks it</b> — later edits won't change it. The{' '}
+            <span className="num font-semibold">{kg(t?.closing_balance_kg)} kg</span> in the infeed area carries to the next shift.
           </p>
           <div className="flex gap-2">
             <button className="btn-primary flex-1" onClick={onEnd} disabled={busy}>

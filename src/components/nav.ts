@@ -7,10 +7,11 @@ export interface NavItem {
   roles: Role[]
 }
 
-// 5 screens. Floor roles see 1; production sees 1; manager sees all.
+// Floor roles see 1–2 screens; manager sees all.
 export const NAV: NavItem[] = [
   { path: '/trucks', label: 'Trucks', icon: '🚚', roles: ['weighbridge', 'receiving', 'manager'] },
   { path: '/production', label: 'Production', icon: '🏭', roles: ['production', 'manager'] },
+  { path: '/stock', label: 'Stock', icon: '📦', roles: ['production', 'qc', 'manager'] },
   { path: '/reports', label: 'Reports', icon: '📄', roles: ['qc', 'manager'] },
   { path: '/dashboard', label: 'Dashboard', icon: '📊', roles: ['manager'] },
   { path: '/team', label: 'Team', icon: '👥', roles: ['manager'] },

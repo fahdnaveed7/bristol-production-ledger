@@ -5,6 +5,7 @@ import { landingPath } from './components/nav'
 import { Login } from './screens/Login'
 import { Trucks } from './screens/Trucks'
 import { Production } from './screens/Production'
+import { Stock } from './screens/Stock'
 import { Reports } from './screens/Reports'
 import { Dashboard } from './screens/Dashboard'
 import { Team } from './screens/Team'
@@ -37,6 +38,7 @@ export default function App() {
 
       <Route path="/trucks" element={<Protected allow={['weighbridge', 'receiving', 'manager']}><Trucks /></Protected>} />
       <Route path="/production" element={<Protected allow={['production', 'manager']}><Production /></Protected>} />
+      <Route path="/stock" element={<Protected allow={['production', 'qc', 'manager']}><Stock /></Protected>} />
       <Route path="/reports" element={<Protected allow={['qc', 'manager']}><Reports /></Protected>} />
       <Route path="/dashboard" element={<Protected allow={['manager']}><Dashboard /></Protected>} />
       <Route path="/team" element={<Protected allow={['manager']}><Team /></Protected>} />
