@@ -7,6 +7,7 @@ import { divergenceFraction, isDivergent } from '../lib/yield'
 import type { Grn, GrnPricing } from '../lib/types'
 import { kg, money, pct } from '../lib/format'
 import { DivergenceBadge, EmptyState, Notice, PageHeader, Stat } from '../components/ui'
+import { ExportPanel } from '../components/ExportPanel'
 
 export function Dashboard() {
   const { profile } = useAuth()
@@ -131,6 +132,11 @@ export function Dashboard() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Export production data (manager) */}
+      <div className="mt-4">
+        <ExportPanel />
       </div>
     </>
   )
