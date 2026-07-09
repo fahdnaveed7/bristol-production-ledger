@@ -44,8 +44,7 @@ export function ExportPanel() {
 
   return (
     <div className="card p-4">
-      <h3 className="font-semibold text-gray-900 mb-1">Export production data</h3>
-      <p className="text-xs text-gray-500 mb-3">Download as CSV (opens in Excel / Google Sheets). Date range is optional.</p>
+      <p className="text-xs text-gray-500 mb-3">Files open in Excel / Google Sheets. Pick a date range, or leave blank for everything.</p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>

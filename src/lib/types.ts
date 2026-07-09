@@ -123,10 +123,11 @@ export const ROLE_LABEL: Record<Role, string> = {
   manager: 'Manager',
 }
 
+// Status badges say what happens NEXT, in plain words.
 export const GRN_STATUS_LABEL: Record<GrnStatus, string> = {
-  weighed_gross: 'Weighed (gross)',
-  sampling: 'Sampling',
-  weighed_tare: 'Weighed (tare)',
+  weighed_gross: 'Next: count boxes',
+  sampling: 'Next: weigh empty truck',
+  weighed_tare: 'Next: confirm received',
   received: 'Received',
   rejected: 'Rejected',
 }

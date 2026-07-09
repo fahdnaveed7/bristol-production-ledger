@@ -1,72 +1,76 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useOpenShift } from '../lib/hooks'
 import { addOutput, createBatch, subscribeShiftBatches } from '../lib/batch'
 import type { Batch, BatchOutput, Product } from '../lib/types'
 import { ACTIVE_PRODUCTS, PRODUCT_LABEL } from '../lib/types'
 import { outputKg, yieldPct } from '../lib/yield'
-import { kg, pct } from '../lib/format'
-import { EmptyState, Notice, PageHeader, Stat } from '../components/ui'
-import { supabase } from '../lib/supabase'
-import type { Grn } from '../lib/types'
+import { kg, pct, timeStr } from '../lib/format'
+import { EmptyState, PageHeader } from '../components/ui'
+import { ShiftBanner } from '../components/ShiftBanner'
 
 export function Production() {
-  const { profile } = useAuth()
-  const { shift } = useOpenShift()
+  const { profile, role } = useAuth()
+  const { shift, reload } = useOpenShift()
   const [batches, setBatches] = useState<Batch[]>([])
   const [outputs, setOutputs] = useState<BatchOutput[]>([])
-  const [receivedKg, setReceivedKg] = useState(0)
 
   useEffect(() => {
-    if (!shift) return
+    if (!shift) {
+      setBatches([])
+      setOutputs([])
+      return
+    }
     return subscribeShiftBatches(shift.id, (b, o) => {
       setBatches(b)
       setOutputs(o)
     })
   }, [shift])
 
-  // Received this shift (for the live silo balance).
-  useEffect(() => {
-    if (!shift) return
-    const load = async () => {
-      const { data } = await supabase.from('grn').select('net_kg').eq('shift_id', shift.id).eq('status', 'received')
-      setReceivedKg(((data as Pick<Grn, 'net_kg'>[]) ?? []).reduce((s, g) => s + (g.net_kg ?? 0), 0))
-    }
-    void load()
-    const ch = supabase
-      .channel(`prod-grn-${shift.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'grn' }, () => void load())
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [shift])
+  const canControl = role === 'production' || role === 'manager'
 
-  const fedKg = useMemo(() => batches.reduce((s, b) => s + (b.raw_fed_kg ?? 0), 0), [batches])
-  const silo = (shift?.opening_balance_kg ?? 0) + receivedKg - fedKg
+  return (
+    <>
+      <PageHeader title="Production" subtitle="Feed fish in, record bags out" />
 
-  const [bf, setBf] = useState({ batch_no: '', raw_fed_kg: '', species_note: '' })
-  const [msg, setMsg] = useState<string | null>(null)
+      <ShiftBanner shift={shift} reload={reload} canControl={canControl} />
+
+      {shift && (
+        <>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FeedForm shiftId={shift.id} profileId={profile!.id} nextNo={batches.length + 1} />
+            <OutputForm latestBatch={batches[0] ?? null} />
+          </div>
+
+          <ShiftLog batches={batches} outputs={outputs} />
+        </>
+      )}
+    </>
+  )
+}
+
+function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: string; nextNo: number }) {
+  const [fed, setFed] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
 
-  async function submitBatch() {
+  async function submit() {
     setMsg(null)
-    if (!shift) return
-    if (!bf.batch_no.trim()) return setMsg('Batch no is required')
-    const fed = Number(bf.raw_fed_kg)
-    if (!fed || fed <= 0) return setMsg('Enter raw material fed (kg)')
+    const n = Number(fed)
+    if (!n || n <= 0) return setMsg('How many kg went into the plant?')
     setBusy(true)
     try {
       const { queued } = await createBatch({
-        batch_no: bf.batch_no,
-        shift_id: shift.id,
-        raw_fed_kg: fed,
-        species_note: bf.species_note,
-        operator_id: profile!.id,
+        batch_no: `B-${nextNo}`, // numbered automatically
+        shift_id: shiftId,
+        raw_fed_kg: n,
+        species_note: note,
+        operator_id: profileId,
       })
-      setBf({ batch_no: '', raw_fed_kg: '', species_note: '' })
-      setMsg(queued ? 'Saved offline — will sync' : 'Batch started')
+      setFed('')
+      setNote('')
+      setMsg(queued ? 'Saved on this device — will send when internet is back' : null)
     } catch (e) {
       setMsg((e as Error).message)
     } finally {
@@ -74,100 +78,51 @@ export function Production() {
     }
   }
 
-  if (!shift) {
-    return (
-      <>
-        <PageHeader title="Production" subtitle="Batches & output" />
-        <Notice tone="warn">
-          No shift is open. <Link className="underline font-semibold" to="/shift">Open a shift</Link> to start feeding raw material.
-        </Notice>
-      </>
-    )
-  }
-
   return (
-    <>
-      <PageHeader title="Production" subtitle={`${shift.label} shift · ${shift.business_date}`} />
-
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <Stat label="Opening" value={kg(shift.opening_balance_kg)} hint="kg" />
-        <Stat label="Received" value={kg(receivedKg)} hint="kg this shift" />
-        <Stat label="Silo balance" value={kg(silo)} hint={`fed ${kg(fedKg)} kg`} accent />
-      </div>
-
-      {msg && (
-        <div className="mb-4">
-          <Notice tone={msg.includes('offline') ? 'warn' : 'success'}>{msg}</Notice>
-        </div>
-      )}
-
-      <div className="card p-4 mb-6">
-        <h2 className="font-semibold text-gray-900 mb-3">New batch — feed raw material</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Batch no</label>
-            <input className="field" value={bf.batch_no} onChange={(e) => setBf((s) => ({ ...s, batch_no: e.target.value }))} />
-          </div>
-          <div>
-            <label className="label">Raw fed (kg)</label>
-            <input className="field num text-lg" value={bf.raw_fed_kg} onChange={(e) => setBf((s) => ({ ...s, raw_fed_kg: e.target.value }))} inputMode="decimal" />
-          </div>
-          <div className="col-span-2">
-            <label className="label">Species note (optional)</label>
-            <input className="field" value={bf.species_note} onChange={(e) => setBf((s) => ({ ...s, species_note: e.target.value }))} />
-          </div>
-        </div>
-        <button className="btn-primary w-full mt-4" onClick={submitBatch} disabled={busy}>
-          {busy ? 'Saving…' : 'Start batch'}
-        </button>
-      </div>
-
-      <h2 className="font-semibold text-gray-900 mb-2">Batches this shift ({batches.length})</h2>
-      {batches.length === 0 ? (
-        <EmptyState>No batches yet this shift.</EmptyState>
-      ) : (
-        <div className="space-y-3">
-          {batches.map((b) => (
-            <BatchCard key={b.id} batch={b} outputs={outputs.filter((o) => o.batch_id === b.id)} />
-          ))}
-        </div>
-      )}
-    </>
+    <div className="card p-4">
+      <h2 className="font-bold text-gray-900 mb-1">⬇ Fish into the plant</h2>
+      <p className="text-xs text-gray-500 mb-3">Each entry is numbered automatically (next: B-{nextNo})</p>
+      <label className="label">Kg fed</label>
+      <input className="field num text-xl mb-2" value={fed} onChange={(e) => setFed(e.target.value)} inputMode="decimal" placeholder="15000" />
+      <label className="label">Fish type (optional)</label>
+      <input className="field mb-3" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sardine" />
+      <button className="btn-primary w-full" onClick={submit} disabled={busy}>
+        {busy ? 'Saving…' : 'Record feed'}
+      </button>
+      {msg && <p className="text-xs text-amber-700 mt-2">{msg}</p>}
+    </div>
   )
 }
 
-function BatchCard({ batch, outputs }: { batch: Batch; outputs: BatchOutput[] }) {
-  const [open, setOpen] = useState(false)
+function OutputForm({ latestBatch }: { latestBatch: Batch | null }) {
   const [product, setProduct] = useState<Product>('fishmeal')
   const [mode, setMode] = useState<'bags' | 'kg'>('bags')
   const [bags, setBags] = useState('')
   const [perBag, setPerBag] = useState('50')
   const [totalKg, setTotalKg] = useState('')
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
 
-  const byProduct = (p: Product) => outputs.filter((o) => o.product === p).reduce((s, o) => s + outputKg(o), 0)
+  const liveKg = mode === 'bags' ? (Number(bags) || 0) * (Number(perBag) || 0) : Number(totalKg) || 0
 
-  async function add() {
-    setErr(null)
+  async function submit() {
+    setMsg(null)
+    if (!latestBatch) return
+    if (liveKg <= 0) return setMsg(mode === 'bags' ? 'How many bags?' : 'How many kg?')
+    setBusy(true)
     try {
-      if (mode === 'bags') {
-        const nb = Number(bags)
-        const pb = Number(perBag)
-        if (!nb || nb <= 0) return setErr('Enter number of bags')
-        if (!pb || pb <= 0) return setErr('Enter kg per bag')
-        setBusy(true)
-        await addOutput({ batch_id: batch.id, product, bags: nb, kg_per_bag: pb, total_kg: nb * pb })
-      } else {
-        const tk = Number(totalKg)
-        if (!tk || tk <= 0) return setErr('Enter kg')
-        setBusy(true)
-        await addOutput({ batch_id: batch.id, product, bags: null, kg_per_bag: null, total_kg: tk })
-      }
+      const { queued } = await addOutput({
+        batch_id: latestBatch.id, // product comes out of the most recent feed
+        product,
+        bags: mode === 'bags' ? Number(bags) : null,
+        kg_per_bag: mode === 'bags' ? Number(perBag) : null,
+        total_kg: liveKg,
+      })
       setBags('')
       setTotalKg('')
+      setMsg(queued ? 'Saved on this device — will send when internet is back' : null)
     } catch (e) {
-      setErr((e as Error).message)
+      setMsg((e as Error).message)
     } finally {
       setBusy(false)
     }
@@ -175,78 +130,109 @@ function BatchCard({ batch, outputs }: { batch: Batch; outputs: BatchOutput[] })
 
   return (
     <div className="card p-4">
-      <div className="flex items-center justify-between">
+      <h2 className="font-bold text-gray-900 mb-1">⬆ Product out</h2>
+      <p className="text-xs text-gray-500 mb-3">
+        {latestBatch ? `Counts against feed ${latestBatch.batch_no}` : 'Record a feed first — then log what comes out'}
+      </p>
+      <div className="grid grid-cols-2 gap-2 mb-2">
         <div>
-          <div className="font-semibold text-gray-900">Batch {batch.batch_no}</div>
-          <div className="text-xs text-gray-500 num">
-            Fed {kg(batch.raw_fed_kg)} kg{batch.species_note ? ` · ${batch.species_note}` : ''}
+          <label className="label">Product</label>
+          <select className="field py-2" value={product} onChange={(e) => setProduct(e.target.value as Product)}>
+            {ACTIVE_PRODUCTS.map((p) => (
+              <option key={p} value={p}>
+                {PRODUCT_LABEL[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Counted as</label>
+          <select className="field py-2" value={mode} onChange={(e) => setMode(e.target.value as 'bags' | 'kg')}>
+            <option value="bags">Bags</option>
+            <option value="kg">Kg</option>
+          </select>
+        </div>
+      </div>
+      {mode === 'bags' ? (
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <label className="label">Bags</label>
+            <input className="field num py-2" value={bags} onChange={(e) => setBags(e.target.value)} inputMode="numeric" placeholder="60" />
+          </div>
+          <div>
+            <label className="label">Kg per bag</label>
+            <select className="field num py-2" value={perBag} onChange={(e) => setPerBag(e.target.value)}>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
           </div>
         </div>
-        <button className="text-sm text-navy font-semibold" onClick={() => setOpen((o) => !o)}>
-          {open ? 'Close' : 'Add output'}
-        </button>
-      </div>
+      ) : (
+        <div className="mb-2">
+          <label className="label">Total kg</label>
+          <input className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" />
+        </div>
+      )}
+      {liveKg > 0 && (
+        <p className="text-sm text-gray-700 mb-2">
+          = <span className="num font-bold text-navy">{kg(liveKg)} kg</span> {PRODUCT_LABEL[product].split(' ')[0].toLowerCase()}
+        </p>
+      )}
+      <button className="btn-primary w-full" onClick={submit} disabled={busy || !latestBatch}>
+        {busy ? 'Saving…' : 'Record output'}
+      </button>
+      {msg && <p className="text-xs text-amber-700 mt-2">{msg}</p>}
+    </div>
+  )
+}
 
-      <div className="grid grid-cols-2 gap-2 mt-3 text-sm num">
-        {ACTIVE_PRODUCTS.map((p) => {
-          const k = byProduct(p)
-          return (
-            <div key={p} className="rounded-md bg-gray-50 px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wide text-gray-400">{PRODUCT_LABEL[p].split(' ')[0]}</div>
-              <div className="font-semibold">{kg(k)} kg</div>
-              <div className="text-[11px] text-gray-400">{pct(yieldPct(k, batch.raw_fed_kg))}</div>
-            </div>
-          )
-        })}
-      </div>
+function ShiftLog({ batches, outputs }: { batches: Batch[]; outputs: BatchOutput[] }) {
+  const fedTotal = batches.reduce((s, b) => s + (b.raw_fed_kg ?? 0), 0)
+  const productTotal = (p: Product) => outputs.filter((o) => o.product === p).reduce((s, o) => s + outputKg(o), 0)
+  const chrono = [...batches].reverse() // oldest first, like a paper log
 
-      {open && (
-        <div className="mt-4 border-t border-gray-100 pt-3">
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <div>
-              <label className="label">Product</label>
-              <select className="field" value={product} onChange={(e) => setProduct(e.target.value as Product)}>
-                {ACTIVE_PRODUCTS.map((p) => (
-                  <option key={p} value={p}>
-                    {PRODUCT_LABEL[p]}
-                  </option>
+  return (
+    <div className="card p-4 mt-4">
+      <h2 className="font-bold text-gray-900 mb-3">This shift's log</h2>
+      {chrono.length === 0 ? (
+        <EmptyState>Nothing fed yet this shift.</EmptyState>
+      ) : (
+        <div className="space-y-3">
+          {chrono.map((b) => {
+            const outs = outputs.filter((o) => o.batch_id === b.id)
+            return (
+              <div key={b.id} className="border-l-2 border-navy-light pl-3">
+                <div className="text-sm">
+                  <span className="font-semibold text-gray-900">{b.batch_no}</span>{' '}
+                  <span className="text-gray-500">· {timeStr(b.started_at)} ·</span>{' '}
+                  <span className="num font-semibold">⬇ {kg(b.raw_fed_kg)} kg in</span>
+                  {b.species_note && <span className="text-gray-500"> · {b.species_note}</span>}
+                </div>
+                {outs.map((o) => (
+                  <div key={o.id} className="text-sm text-gray-600 num">
+                    ⬆ {o.bags ? `${o.bags} bags × ${o.kg_per_bag} = ` : ''}
+                    {kg(outputKg(o))} kg {o.product === 'fishmeal' ? 'fishmeal' : 'fish oil'}
+                  </div>
                 ))}
-              </select>
-            </div>
+              </div>
+            )
+          })}
+
+          <div className="border-t border-gray-200 pt-3 grid grid-cols-3 gap-2 text-sm num">
             <div>
-              <label className="label">Measure</label>
-              <select className="field" value={mode} onChange={(e) => setMode(e.target.value as 'bags' | 'kg')}>
-                <option value="bags">Bags</option>
-                <option value="kg">Direct kg</option>
-              </select>
+              <div className="label">Fed total</div>
+              <div className="font-bold">{kg(fedTotal)} kg</div>
             </div>
+            {ACTIVE_PRODUCTS.map((p) => (
+              <div key={p}>
+                <div className="label">{PRODUCT_LABEL[p].split(' ')[0]}</div>
+                <div className="font-bold">
+                  {kg(productTotal(p))} kg{' '}
+                  <span className="text-gray-400 font-normal">{pct(yieldPct(productTotal(p), fedTotal))}</span>
+                </div>
+              </div>
+            ))}
           </div>
-
-          {mode === 'bags' ? (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="label">Bags</label>
-                <input className="field num" value={bags} onChange={(e) => setBags(e.target.value)} inputMode="numeric" />
-              </div>
-              <div>
-                <label className="label">kg / bag</label>
-                <select className="field num" value={perBag} onChange={(e) => setPerBag(e.target.value)}>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                </select>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="label">Total kg</label>
-              <input className="field num" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" />
-            </div>
-          )}
-
-          <button className="btn-primary w-full mt-3" onClick={add} disabled={busy}>
-            {busy ? 'Saving…' : `Add ${PRODUCT_LABEL[product].split(' ')[0]} output`}
-          </button>
-          {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
         </div>
       )}
     </div>

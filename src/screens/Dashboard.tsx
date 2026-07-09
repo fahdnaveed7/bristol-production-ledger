@@ -71,34 +71,38 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle={shift ? `Live · ${shift.label} shift · ${shift.business_date}` : 'No shift open'} />
+      <PageHeader title="Dashboard" subtitle={shift ? `Live · ${shift.label} shift · ${shift.business_date}` : 'No shift running right now'} />
 
+      {/* 1 · Right now */}
+      <h2 className="font-bold text-gray-900 mb-2">Right now</h2>
       {!shift ? (
-        <Notice tone="info">No shift is currently open. Open one from the Shift screen to see live totals.</Notice>
+        <div className="mb-4">
+          <Notice tone="info">No shift is running. The production team starts one from their Production screen.</Notice>
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <Stat label="Opening" value={kg(shift.opening_balance_kg)} hint="kg" />
-            <Stat label="Received" value={kg(totals?.received_kg)} hint="kg" />
-            <Stat label="Fed" value={kg(totals?.fed_kg)} hint="kg" />
-            <Stat label="Balance" value={kg(totals?.closing_balance_kg)} hint="kg" accent />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <Stat label="Started with" value={kg(shift.opening_balance_kg)} hint="kg in store" />
+            <Stat label="Trucks brought" value={kg(totals?.received_kg)} hint="kg" />
+            <Stat label="Fed to plant" value={kg(totals?.fed_kg)} hint="kg" />
+            <Stat label="In store now" value={kg(totals?.closing_balance_kg)} hint="kg" accent />
           </div>
 
           <div className="card p-4 mb-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Output &amp; running yield</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Made so far this shift</h3>
             <div className="grid grid-cols-2 gap-3">
-              <Stat label="Fishmeal" value={kg(totals?.fishmeal_kg)} hint={pct(totals?.yield_fishmeal_pct)} />
-              <Stat label="Fish oil" value={kg(totals?.fishoil_kg)} hint={pct(totals?.yield_fishoil_pct)} />
+              <Stat label="Fishmeal" value={kg(totals?.fishmeal_kg)} hint={`yield ${pct(totals?.yield_fishmeal_pct)}`} />
+              <Stat label="Fish oil" value={kg(totals?.fishoil_kg)} hint={`yield ${pct(totals?.yield_fishoil_pct)}`} />
             </div>
           </div>
         </>
       )}
 
-      {/* Divergence flags */}
+      {/* 2 · Needs attention */}
+      <h2 className="font-bold text-gray-900 mb-2 mt-6">Needs a check {flags.length > 0 && `(${flags.length})`}</h2>
       <div className="card p-4 mb-4">
-        <h3 className="font-semibold text-gray-900 mb-3">Divergence flags ({flags.length})</h3>
         {flags.length === 0 ? (
-          <EmptyState>No trucks exceed the 5% net-vs-estimate threshold.</EmptyState>
+          <EmptyState>All trucks fine — scale and box counts agree everywhere.</EmptyState>
         ) : (
           <div className="space-y-2">
             {flags.map((g) => {
@@ -107,7 +111,7 @@ export function Dashboard() {
                 <div key={g.id} className="flex items-center justify-between gap-2 text-sm">
                   <div className="min-w-0">
                     <span className="font-medium">{g.vehicle_no}</span>{' '}
-                    <span className="text-gray-500 num">net {kg(g.net_kg)} vs est {kg(g.sampled_estimate_kg)}</span>
+                    <span className="text-gray-500 num">scale says {kg(g.net_kg)} kg, boxes say {kg(g.sampled_estimate_kg)} kg</span>
                   </div>
                   {d != null && <DivergenceBadge fraction={d} />}
                 </div>
@@ -117,10 +121,12 @@ export function Dashboard() {
         )}
       </div>
 
+      <h2 className="font-bold text-gray-900 mb-2 mt-6">Money — only managers see this</h2>
+
       {/* Rate entry — MANAGER ONLY (RLS enforced) */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Rate &amp; amount (manager only)</h3>
+          <h3 className="font-semibold text-gray-900">Price per truck</h3>
           <span className="num text-sm font-bold text-navy">Total {money(totalAmount)}</span>
         </div>
         {received.length === 0 ? (
@@ -135,9 +141,8 @@ export function Dashboard() {
       </div>
 
       {/* Export production data (manager) */}
-      <div className="mt-4">
-        <ExportPanel />
-      </div>
+      <h2 className="font-bold text-gray-900 mb-2 mt-6">Download data</h2>
+      <ExportPanel />
     </>
   )
 }

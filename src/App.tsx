@@ -3,10 +3,8 @@ import { useAuth } from './auth/AuthContext'
 import { Layout } from './components/Layout'
 import { landingPath } from './components/nav'
 import { Login } from './screens/Login'
-import { Weighbridge } from './screens/Weighbridge'
-import { Receiving } from './screens/Receiving'
+import { Trucks } from './screens/Trucks'
 import { Production } from './screens/Production'
-import { ShiftScreen } from './screens/ShiftScreen'
 import { Reports } from './screens/Reports'
 import { Dashboard } from './screens/Dashboard'
 import { Team } from './screens/Team'
@@ -37,13 +35,16 @@ export default function App() {
       />
       <Route path="/" element={loading ? <Splash /> : <Navigate to={session ? landingPath(role) : '/login'} replace />} />
 
-      <Route path="/weighbridge" element={<Protected allow={['weighbridge', 'manager']}><Weighbridge /></Protected>} />
-      <Route path="/receiving" element={<Protected allow={['receiving', 'manager']}><Receiving /></Protected>} />
+      <Route path="/trucks" element={<Protected allow={['weighbridge', 'receiving', 'manager']}><Trucks /></Protected>} />
       <Route path="/production" element={<Protected allow={['production', 'manager']}><Production /></Protected>} />
-      <Route path="/shift" element={<Protected allow={['production', 'manager']}><ShiftScreen /></Protected>} />
       <Route path="/reports" element={<Protected allow={['qc', 'manager']}><Reports /></Protected>} />
       <Route path="/dashboard" element={<Protected allow={['manager']}><Dashboard /></Protected>} />
       <Route path="/team" element={<Protected allow={['manager']}><Team /></Protected>} />
+
+      {/* old paths from the previous layout */}
+      <Route path="/weighbridge" element={<Navigate to="/trucks" replace />} />
+      <Route path="/receiving" element={<Navigate to="/trucks" replace />} />
+      <Route path="/shift" element={<Navigate to="/production" replace />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
