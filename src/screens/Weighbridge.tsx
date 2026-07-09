@@ -261,9 +261,9 @@ function TareCard({ grn, onDone }: { grn: Grn; onDone: () => void }) {
         </>
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-md bg-teal-light px-3 py-2 mb-3">
-            <span className="text-sm font-medium text-teal-dark">Net weight</span>
-            <span className="num text-xl font-bold text-teal-dark">{kg(net)} kg</span>
+          <div className="flex items-center justify-between rounded-md bg-navy-light px-3 py-2 mb-3">
+            <span className="text-sm font-medium text-navy-dark">Net weight</span>
+            <span className="num text-xl font-bold text-navy-dark">{kg(net)} kg</span>
           </div>
           {flagged && div != null && (
             <div className="mb-3 flex items-center gap-2">

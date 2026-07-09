@@ -63,10 +63,8 @@ function csvFor(r: ShiftReport): string {
     ['Closing balance (kg)', r.closing_balance_kg],
     ['Fishmeal (kg)', r.fishmeal_kg],
     ['Fish oil (kg)', r.fishoil_kg],
-    ['FSP (kg)', r.fsp_kg],
     ['Fishmeal yield %', r.yield_fishmeal_pct?.toFixed(2) ?? ''],
     ['Fish oil yield %', r.yield_fishoil_pct?.toFixed(2) ?? ''],
-    ['FSP yield %', r.yield_fsp_pct?.toFixed(2) ?? ''],
     ['Generated at', r.generated_at],
   ]
   return rows.map(([k, v]) => `"${k}","${v ?? ''}"`).join('\n')
@@ -112,7 +110,7 @@ function ReportDetail({ report: r, onBack }: { report: ShiftReport; onBack: () =
   return (
     <>
       <div className="flex items-center justify-between mb-4 no-print">
-        <button className="text-sm text-teal font-semibold" onClick={onBack}>
+        <button className="text-sm text-navy font-semibold" onClick={onBack}>
           ← All reports
         </button>
         <div className="flex gap-2">
@@ -157,7 +155,6 @@ function ReportDetail({ report: r, onBack }: { report: ShiftReport; onBack: () =
         <h3 className="font-semibold text-gray-900 text-sm uppercase tracking-wide mt-4 mb-1">Output &amp; yield</h3>
         <Row label="Fishmeal" value={`${kg(r.fishmeal_kg)} kg   ·   ${pct(r.yield_fishmeal_pct)}`} />
         <Row label="Fish oil" value={`${kg(r.fishoil_kg)} kg   ·   ${pct(r.yield_fishoil_pct)}`} />
-        <Row label="FSP (fish soluble paste)" value={`${kg(r.fsp_kg)} kg   ·   ${pct(r.yield_fsp_pct)}`} />
 
         <div className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-xs text-gray-500">
           <span>Generated {dateTimeStr(r.generated_at)}</span>

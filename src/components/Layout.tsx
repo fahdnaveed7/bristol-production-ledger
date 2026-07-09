@@ -43,9 +43,12 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-full md:flex">
       {/* Desktop left rail */}
       <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 border-r border-gray-200 bg-white">
-        <div className="px-4 py-4 border-b border-gray-200">
-          <div className="font-bold text-teal leading-tight">Bristol Proteins &amp; Oils</div>
-          <div className="text-xs text-gray-400">Production Ledger</div>
+        <div className="px-4 py-4 border-b border-gray-200 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gold text-white grid place-items-center text-base font-bold shrink-0">B</div>
+          <div className="min-w-0">
+            <div className="font-bold text-navy leading-tight text-sm truncate">Bristol Proteins &amp; Oils</div>
+            <div className="text-xs text-gray-400">Production Ledger</div>
+          </div>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {items.map((n) => (
@@ -54,7 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
               to={n.path}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-                  isActive ? 'bg-teal-light text-teal-dark' : 'text-gray-600 hover:bg-gray-50'
+                  isActive ? 'bg-navy-light text-navy-dark' : 'text-gray-600 hover:bg-gray-50'
                 }`
               }
             >
@@ -75,7 +78,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="font-bold text-teal text-sm">Bristol Ledger</div>
+          <div className="font-bold text-navy text-sm">Bristol Ledger</div>
           <div className="flex items-center gap-2">
             <OfflineChip />
             <button className="text-xs text-gray-500 underline" onClick={onLogout}>
@@ -98,7 +101,7 @@ export function Layout({ children }: { children: ReactNode }) {
               to={n.path}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] ${
-                  isActive ? 'text-teal font-semibold' : 'text-gray-500'
+                  isActive ? 'text-navy font-semibold' : 'text-gray-500'
                 }`
               }
             >

@@ -135,9 +135,9 @@ function SamplingCard({ grn, disabled }: { grn: Grn; disabled: boolean }) {
           <div className="label">Avg / box</div>
           <div className="num text-lg font-bold">{avg != null ? kg(avg, 1) : '—'} kg</div>
         </div>
-        <div className="rounded-md bg-teal-light px-3 py-2">
+        <div className="rounded-md bg-navy-light px-3 py-2">
           <div className="label">Estimate</div>
-          <div className="num text-lg font-bold text-teal-dark">{estimate != null ? kg(estimate) : '—'} kg</div>
+          <div className="num text-lg font-bold text-navy-dark">{estimate != null ? kg(estimate) : '—'} kg</div>
         </div>
       </div>
 

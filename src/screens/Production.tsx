@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useOpenShift } from '../lib/hooks'
 import { addOutput, createBatch, subscribeShiftBatches } from '../lib/batch'
 import type { Batch, BatchOutput, Product } from '../lib/types'
-import { PRODUCTS, PRODUCT_LABEL } from '../lib/types'
+import { ACTIVE_PRODUCTS, PRODUCT_LABEL } from '../lib/types'
 import { outputKg, yieldPct } from '../lib/yield'
 import { kg, pct } from '../lib/format'
 import { EmptyState, Notice, PageHeader, Stat } from '../components/ui'
@@ -182,13 +182,13 @@ function BatchCard({ batch, outputs }: { batch: Batch; outputs: BatchOutput[] })
             Fed {kg(batch.raw_fed_kg)} kg{batch.species_note ? ` · ${batch.species_note}` : ''}
           </div>
         </div>
-        <button className="text-sm text-teal font-semibold" onClick={() => setOpen((o) => !o)}>
+        <button className="text-sm text-navy font-semibold" onClick={() => setOpen((o) => !o)}>
           {open ? 'Close' : 'Add output'}
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-3 text-sm num">
-        {PRODUCTS.map((p) => {
+      <div className="grid grid-cols-2 gap-2 mt-3 text-sm num">
+        {ACTIVE_PRODUCTS.map((p) => {
           const k = byProduct(p)
           return (
             <div key={p} className="rounded-md bg-gray-50 px-2 py-1.5">
@@ -206,7 +206,7 @@ function BatchCard({ batch, outputs }: { batch: Batch; outputs: BatchOutput[] })
             <div>
               <label className="label">Product</label>
               <select className="field" value={product} onChange={(e) => setProduct(e.target.value as Product)}>
-                {PRODUCTS.map((p) => (
+                {ACTIVE_PRODUCTS.map((p) => (
                   <option key={p} value={p}>
                     {PRODUCT_LABEL[p]}
                   </option>

@@ -40,7 +40,7 @@ export function Stat({ label, value, hint, accent }: { label: string; value: str
   return (
     <div className="card p-3">
       <div className="label">{label}</div>
-      <div className={`num text-2xl font-bold ${accent ? 'text-teal' : 'text-gray-900'}`}>{value}</div>
+      <div className={`num text-2xl font-bold ${accent ? 'text-navy' : 'text-gray-900'}`}>{value}</div>
       {hint && <div className="text-xs text-gray-400 mt-0.5">{hint}</div>}
     </div>
   )
@@ -52,7 +52,7 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function Notice({ tone = 'info', children }: { tone?: 'info' | 'warn' | 'error' | 'success'; children: ReactNode }) {
   const styles = {
-    info: 'bg-teal-light text-teal-dark border-teal/30',
+    info: 'bg-navy-light text-navy-dark border-navy/30',
     warn: 'bg-amber-50 text-amber-800 border-amber-200',
     error: 'bg-red-50 text-red-800 border-red-200',
     success: 'bg-green-50 text-green-800 border-green-200',

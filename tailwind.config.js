@@ -4,11 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        teal: {
-          DEFAULT: '#2f7d75',
-          dark: '#265f59',
-          light: '#e6f1ef',
+        // Brand palette sampled from the Bristol logo.
+        navy: {
+          DEFAULT: '#1a293c',
+          dark: '#10202f',
+          light: '#e8ebf0',
         },
+        gold: {
+          DEFAULT: '#a87a3d',
+          dark: '#8a6330',
+          light: '#f3ecdd',
+        },
+        cream: '#eeecdd',
       },
       fontFamily: {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'monospace'],

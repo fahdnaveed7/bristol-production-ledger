@@ -153,10 +153,9 @@ function OpenShiftPanel({
       <div className="card p-4 mb-4">
         <h3 className="font-semibold text-gray-900 mb-3">Output &amp; yield (live)</h3>
         {totals ? (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Stat label="Fishmeal" value={kg(totals.fishmeal_kg)} hint={pct(totals.yield_fishmeal_pct)} />
             <Stat label="Fish oil" value={kg(totals.fishoil_kg)} hint={pct(totals.yield_fishoil_pct)} />
-            <Stat label="FSP" value={kg(totals.fsp_kg)} hint={pct(totals.yield_fsp_pct)} />
           </div>
         ) : (
           <EmptyState>Computing…</EmptyState>

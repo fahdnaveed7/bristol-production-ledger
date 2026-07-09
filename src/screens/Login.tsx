@@ -61,23 +61,23 @@ export function Login() {
     <div className="min-h-full flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="mx-auto w-14 h-14 rounded-xl bg-teal text-white grid place-items-center text-2xl font-bold mb-3">
+          <div className="mx-auto w-14 h-14 rounded-xl bg-gold text-white grid place-items-center text-2xl font-bold mb-3">
             B
           </div>
-          <h1 className="text-lg font-bold text-gray-900">Bristol Proteins &amp; Oils</h1>
+          <h1 className="text-lg font-bold text-navy">Bristol Proteins &amp; Oils</h1>
           <p className="text-sm text-gray-500">Production Ledger</p>
         </div>
 
         <div className="card p-5">
           <div className="flex rounded-md bg-gray-100 p-1 mb-4 text-sm font-semibold">
             <button
-              className={`flex-1 rounded py-2 ${mode === 'login' ? 'bg-white shadow-sm text-teal' : 'text-gray-500'}`}
+              className={`flex-1 rounded py-2 ${mode === 'login' ? 'bg-white shadow-sm text-navy' : 'text-gray-500'}`}
               onClick={() => { setMode('login'); setError(null); setPin('') }}
             >
               Sign in
             </button>
             <button
-              className={`flex-1 rounded py-2 ${mode === 'register' ? 'bg-white shadow-sm text-teal' : 'text-gray-500'}`}
+              className={`flex-1 rounded py-2 ${mode === 'register' ? 'bg-white shadow-sm text-navy' : 'text-gray-500'}`}
               onClick={() => { setMode('register'); setError(null); setPin('') }}
             >
               Register
@@ -119,7 +119,7 @@ export function Login() {
               <div
                 key={i}
                 className={`w-8 h-10 rounded-md border grid place-items-center text-xl ${
-                  pin.length > i ? 'border-teal bg-teal-light' : 'border-gray-300'
+                  pin.length > i ? 'border-navy bg-navy-light' : 'border-gray-300'
                 }`}
               >
                 {pin.length > i ? '•' : ''}

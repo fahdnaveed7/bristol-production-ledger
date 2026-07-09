@@ -105,6 +105,10 @@ export interface ShiftReport {
 
 export const PRODUCTS: Product[] = ['fishmeal', 'fishoil', 'fsp']
 
+// Products currently surfaced in the UI. FSP is parked for now (schema keeps its
+// columns so it can be switched back on by adding 'fsp' here).
+export const ACTIVE_PRODUCTS: Product[] = ['fishmeal', 'fishoil']
+
 export const PRODUCT_LABEL: Record<Product, string> = {
   fishmeal: 'Fishmeal',
   fishoil: 'Fish Oil',

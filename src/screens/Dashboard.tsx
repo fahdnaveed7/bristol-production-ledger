@@ -85,10 +85,9 @@ export function Dashboard() {
 
           <div className="card p-4 mb-4">
             <h3 className="font-semibold text-gray-900 mb-3">Output &amp; running yield</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Stat label="Fishmeal" value={kg(totals?.fishmeal_kg)} hint={pct(totals?.yield_fishmeal_pct)} />
               <Stat label="Fish oil" value={kg(totals?.fishoil_kg)} hint={pct(totals?.yield_fishoil_pct)} />
-              <Stat label="FSP" value={kg(totals?.fsp_kg)} hint={pct(totals?.yield_fsp_pct)} />
             </div>
           </div>
         </>
@@ -121,7 +120,7 @@ export function Dashboard() {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-gray-900">Rate &amp; amount (manager only)</h3>
-          <span className="num text-sm font-bold text-teal">Total {money(totalAmount)}</span>
+          <span className="num text-sm font-bold text-navy">Total {money(totalAmount)}</span>
         </div>
         {received.length === 0 ? (
           <EmptyState>No received trucks in the current shift to price.</EmptyState>
