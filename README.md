@@ -84,3 +84,16 @@ execution may need an environment that permits launching Chrome.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Pages source must be GitHub Actions.
 The Vite base is `/bristol-production-ledger/` in Actions and `/` locally; the deploy
 workflow copies `index.html` to `404.html` for direct route loads.
+
+## Vercel
+
+Import this repository with the Vite preset. Build command: `npm run build`;
+output directory: `dist`. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+for Production and Preview using the active existing Supabase project's URL and
+publishable key. Rebuild after environment changes. Never upload a service-role key.
+
+`vercel.json` sends direct routes such as `/trucks` and `/reports` to the app shell.
+Vercel builds use `/` as the base; GitHub Pages retains its repository subpath.
+Supabase remains the database and authentication backend; deployment does not
+copy, reset, or migrate its tables. Existing sessions are origin-specific, so staff
+will sign in again on the new Vercel domain.

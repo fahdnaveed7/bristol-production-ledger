@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ command }) => ({
   // Served from GitHub Pages under /bristol-production-ledger/; dev stays at /
-  base: command === 'build' && process.env.GITHUB_ACTIONS ? '/bristol-production-ledger/' : '/',
+  base: command === 'build' && process.env.GITHUB_ACTIONS && !process.env.VERCEL ? '/bristol-production-ledger/' : '/',
   plugins: [
     react(),
     VitePWA({

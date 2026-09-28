@@ -15,3 +15,5 @@ tsconfig.tsbuildinfo
 .previous-node-modules
 playwright-report
 test-results
+
+.vercel
