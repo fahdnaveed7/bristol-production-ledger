@@ -1,7 +1,8 @@
+import { readAll } from './read'
 import { supabase } from './supabase'
 import type { DateRange } from './export'
 import { fetchStock } from './stock'
-import { outputKg } from './yield'
+import { outputKg, yieldPct } from './yield'
 import type { Profile } from './types'
 
 // Brand colours for the workbook (ARGB).
@@ -20,7 +21,7 @@ interface ColDef {
 }
 
 async function names(): Promise<Record<string, string>> {
-  const { data } = await supabase.from('profiles').select('id,name')
+  const { data } = await readAll(supabase.from('profiles').select('id,name'))
   const m: Record<string, string> = {}
   ;(data as Pick<Profile, 'id' | 'name'>[] | null ?? []).forEach((p) => (m[p.id] = p.name))
   return m
@@ -88,7 +89,7 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
     let q = supabase.from('shift_report').select('*').order('business_date', { ascending: true })
     if (range.from) q = q.gte('business_date', range.from)
     if (range.to) q = q.lte('business_date', range.to)
-    const { data } = await q
+    const { data } = await readAll(q)
     addSheet(
       'Shift Reports',
       [
@@ -117,7 +118,7 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
     let q = supabase.from('grn').select('*').order('entry_date', { ascending: true }).order('arrived_at', { ascending: true })
     if (range.from) q = q.gte('entry_date', range.from)
     if (range.to) q = q.lte('entry_date', range.to)
-    const { data } = await q
+    const { data } = await readAll(q)
     addSheet(
       'Trucks',
       [
@@ -147,13 +148,13 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
 
   // ---- 3 · Production ----
   {
-    let q = supabase.from('batch').select('*').order('started_at', { ascending: true })
-    if (range.from) q = q.gte('started_at', range.from)
-    if (range.to) q = q.lte('started_at', range.to + 'T23:59:59')
-    const { data: batches } = await q
+    let q = supabase.from('batch').select('*,shift:shift_id!inner(business_date)').order('started_at', { ascending: true })
+    if (range.from) q = q.gte('shift.business_date', range.from)
+    if (range.to) q = q.lte('shift.business_date', range.to)
+    const { data: batches } = await readAll(q)
     const ids = (batches ?? []).map((b) => b.id)
     const { data: outs } = ids.length
-      ? await supabase.from('batch_output').select('*').in('batch_id', ids)
+      ? await readAll(supabase.from('batch_output').select('*').in('batch_id', ids))
       : { data: [] }
     const rows: (string | number | null)[][] = []
     for (const b of batches ?? []) {
@@ -163,15 +164,15 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
       const oil = bo.filter((o) => o.product === 'fishoil').reduce((s, o) => s + outputKg(o), 0)
       rows.push([
         b.batch_no,
-        b.started_at?.slice(0, 10) ?? null,
+        b.shift.business_date,
         nameOf(b.operator_id),
         b.raw_fed_kg,
         b.species_note,
         mealBags || null,
         meal || null,
         oil || null,
-        b.raw_fed_kg ? (meal / b.raw_fed_kg) * 100 : null,
-        b.raw_fed_kg ? (oil / b.raw_fed_kg) * 100 : null,
+        yieldPct(meal, b.raw_fed_kg),
+        yieldPct(oil, b.raw_fed_kg),
       ])
     }
     addSheet(
@@ -194,10 +195,11 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
 
   // ---- 4 · Stock register ----
   {
-    const { days, totals } = await fetchStock()
+    const { days } = await fetchStock()
     const inRange = days.filter(
       (d) => (!range.from || d.date >= range.from) && (!range.to || d.date <= range.to),
     )
+    const totals = inRange.reduce((t, d) => ({ fishmealBags: t.fishmealBags + d.fishmealBags, fishmealKg: t.fishmealKg + d.fishmealKg, fishoilKg: t.fishoilKg + d.fishoilKg }), { fishmealBags: 0, fishmealKg: 0, fishoilKg: 0 })
     const rows = inRange.map((d) => [d.date, d.label, d.fishmealBags || null, d.fishmealKg || null, d.fishoilKg || null])
     const ws = addSheet(
       'Stock Register',
@@ -225,11 +227,11 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
 
   // ---- 5 · Pricing (only returns rows for managers — RLS) ----
   {
-    const { data: pricing } = await supabase.from('grn_pricing').select('*')
+    const { data: pricing } = await readAll(supabase.from('grn_pricing').select('*'))
     const ids = (pricing ?? []).map((p) => p.grn_id)
     const grnById: Record<string, { entry_date: string; vehicle_no: string; supplier: string | null; net_kg: number | null }> = {}
     if (ids.length) {
-      const { data: g } = await supabase.from('grn').select('id,entry_date,vehicle_no,supplier,net_kg').in('id', ids)
+      const { data: g } = await readAll(supabase.from('grn').select('id,entry_date,vehicle_no,supplier,net_kg').in('id', ids))
       ;(g ?? []).forEach((r) => (grnById[r.id] = r))
     }
     addSheet(
@@ -243,7 +245,10 @@ export async function exportExcelWorkbook(range: DateRange = {}): Promise<void> 
         { header: 'Amount', width: 14, numFmt: MONEY },
         { header: 'Entered by', width: 16 },
       ],
-      (pricing ?? []).map((p) => {
+      (pricing ?? []).filter((p) => {
+        const date = grnById[p.grn_id]?.entry_date
+        return date && (!range.from || date >= range.from) && (!range.to || date <= range.to)
+      }).map((p) => {
         const g = grnById[p.grn_id]
         return [g?.entry_date ?? null, g?.vehicle_no ?? null, g?.supplier ?? null, g?.net_kg ?? null, p.rate_per_kg, p.amount, nameOf(p.entered_by)]
       }),

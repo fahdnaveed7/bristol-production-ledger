@@ -1,3 +1,4 @@
+import { CAPTURE_CHANGED } from '../offline/queue'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { closeShift, computeShiftTotals, getLastClosedShift, openShift, suggestShift, type ShiftTotals } from '../lib/shift'
@@ -5,7 +6,7 @@ import { useRealtime } from '../lib/hooks'
 import type { Shift } from '../lib/types'
 import { kg, timeStr } from '../lib/format'
 
-// One banner, everywhere: is a shift running, how much fish is in store,
+// One banner, everywhere: is a shift running, how much fish is in the infeed area,
 // and (for production/manager) the start/end controls — right where people work.
 export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null; reload: () => void; canControl: boolean }) {
   const { profile } = useAuth()
@@ -20,16 +21,18 @@ export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null
   const [bizDate, setBizDate] = useState(suggestion.business_date)
 
   const refresh = useCallback(() => {
-    if (shift) computeShiftTotals(shift).then(setTotals)
+    if (shift) computeShiftTotals(shift).then(setTotals).catch((e) => setErr(e.message))
   }, [shift])
 
   useEffect(() => {
     refresh()
-    if (!shift) getLastClosedShift().then((s) => setLastClosing(s?.closing_balance_kg ?? 0))
+    if (!shift) getLastClosedShift().then((s) => setLastClosing(s?.closing_balance_kg ?? 0)).catch((e) => setErr(e.message))
   }, [shift, refresh])
+  useEffect(() => { window.addEventListener(CAPTURE_CHANGED, refresh); return () => window.removeEventListener(CAPTURE_CHANGED, refresh) }, [refresh])
   useRealtime(['grn', 'batch', 'batch_output'], refresh)
 
   async function onStart() {
+    if (!bizDate) return setErr("Which date does the shift start on?")
     setBusy(true)
     setErr(null)
     try {
@@ -48,7 +51,7 @@ export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null
     setBusy(true)
     setErr(null)
     try {
-      await closeShift(shift, null) // QC verifies later, in Reports
+      await closeShift(shift) // QC verifies later, in Reports
       setEnding(false)
       reload()
     } catch (e) {
@@ -75,14 +78,14 @@ export function ShiftBanner({ shift, reload, canControl }: { shift: Shift | null
             <div className="flex flex-wrap items-end gap-2">
               <div>
                 <label className="label">Shift</label>
-                <select className="field py-2 w-44" value={label} onChange={(e) => setLabel(e.target.value as 'day' | 'night')}>
+                <select aria-label="Shift" className="field py-2 w-44" value={label} onChange={(e) => setLabel(e.target.value as 'day' | 'night')}>
                   <option value="day">Day (8am – 8pm)</option>
                   <option value="night">Night (8pm – 8am)</option>
                 </select>
               </div>
               <div>
                 <label className="label">Date</label>
-                <input className="field num py-2" type="date" value={bizDate} onChange={(e) => setBizDate(e.target.value)} />
+                <input aria-label="Date" className="field num py-2" type="date" value={bizDate} onChange={(e) => setBizDate(e.target.value)} />
               </div>
               <button className="btn-primary" onClick={onStart} disabled={busy}>
                 {busy ? 'Starting…' : 'Start shift'}

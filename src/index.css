@@ -63,3 +63,34 @@ body {
     border: none !important;
   }
 }
+
+/* Plant-floor readability and comfortable touch controls. */
+.field, .btn-primary, .btn-ghost { min-height: 48px; }
+.label { font-size: .8125rem; letter-spacing: .035em; }
+.text-xs { font-size: .8125rem; line-height: 1.5; }
+.text-gray-400 { color: #66717e; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid #a87a3d; outline-offset: 3px;
+}
+.card { border-color: #dedfdc; border-radius: 12px; }
+h1 { color: #1a293c !important; }
+main > div:first-child h1 { font-size: 1.75rem; letter-spacing: -.035em; }
+aside { min-height: 100vh; }
+aside nav a { min-height: 48px; }
+@media (min-width: 768px) {
+  aside { position: sticky; top: 0; height: 100vh; }
+  main { max-width: 1080px !important; padding: 2rem !important; }
+}
+@media (max-width: 767px) {
+  nav.fixed { padding-bottom: env(safe-area-inset-bottom); }
+  nav.fixed a { min-height: 64px; font-size: .75rem; }
+  main { padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important; }
+}
+@media print {
+  aside, header, nav, button { display: none !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  .print-sheet { break-inside: avoid; }
+}
+
+/* Column headers remain table cells, even when sharing label typography. */
+th.label { display: table-cell; }

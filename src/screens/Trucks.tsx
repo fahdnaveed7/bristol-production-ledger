@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useOpenShift } from '../lib/hooks'
 import { createGrnGross, registerNoSeenToday, subscribeGrn } from '../lib/grn'
 import type { Grn } from '../lib/types'
-import { kg } from '../lib/format'
+import { kg, localDate } from '../lib/format'
 import { EmptyState, Notice, PageHeader } from '../components/ui'
 import { ShiftBanner } from '../components/ShiftBanner'
 import { TruckCard } from '../components/TruckCard'
@@ -14,7 +14,7 @@ export function Trucks() {
   const [rows, setRows] = useState<Grn[]>([])
   useEffect(() => subscribeGrn(setRows), [])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDate()
   const inProgress = useMemo(
     () =>
       rows
@@ -98,7 +98,7 @@ function NewTruckForm({ shiftId, profileId, today }: { shiftId: string; profileI
     setMsg(null)
     if (!f.vehicle_no.trim()) return setMsg('Type the vehicle number')
     const gross = Number(f.gross_kg)
-    if (!gross || gross <= 0) return setMsg('Type the loaded weight from the scale')
+    if (!Number.isFinite(gross) || gross <= 0) return setMsg('Type the loaded weight from the scale')
     setBusy(true)
     try {
       const { queued } = await createGrnGross({
@@ -141,29 +141,29 @@ function NewTruckForm({ shiftId, profileId, today }: { shiftId: string; profileI
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Vehicle no</label>
-          <input className="field" value={f.vehicle_no} onChange={(e) => setF((s) => ({ ...s, vehicle_no: e.target.value }))} placeholder="TN-01-4590" />
+          <input aria-label="Vehicle no" className="field" value={f.vehicle_no} onChange={(e) => setF((s) => ({ ...s, vehicle_no: e.target.value }))} placeholder="TN-01-4590" />
         </div>
         <div>
           <label className="label">Register no (paper slip)</label>
-          <input className="field num" value={f.register_no} onChange={(e) => checkDup(e.target.value)} inputMode="numeric" />
+          <input aria-label="Register no (paper slip)" className="field num" value={f.register_no} onChange={(e) => checkDup(e.target.value)} inputMode="numeric" />
           {dupWarn && <p className="text-xs text-amber-700 mt-1">⚠ Already typed today — check it's not a duplicate</p>}
         </div>
         <div>
           <label className="label">Fish type</label>
-          <input className="field" value={f.species} onChange={(e) => setF((s) => ({ ...s, species: e.target.value }))} placeholder="Sardine" />
+          <input aria-label="Fish type" className="field" value={f.species} onChange={(e) => setF((s) => ({ ...s, species: e.target.value }))} placeholder="Sardine" />
         </div>
         <div>
           <label className="label">Supplier</label>
-          <input className="field" value={f.supplier} onChange={(e) => setF((s) => ({ ...s, supplier: e.target.value }))} />
+          <input aria-label="Supplier" className="field" value={f.supplier} onChange={(e) => setF((s) => ({ ...s, supplier: e.target.value }))} />
         </div>
         <div className="col-span-2">
           <label className="label">Driver</label>
-          <input className="field" value={f.driver_name} onChange={(e) => setF((s) => ({ ...s, driver_name: e.target.value }))} />
+          <input aria-label="Driver" className="field" value={f.driver_name} onChange={(e) => setF((s) => ({ ...s, driver_name: e.target.value }))} />
         </div>
         <div className="col-span-2">
           <label className="label">Weight on scale — truck full (kg)</label>
           <input
-            className="field num text-xl"
+aria-label="Weight on scale — truck full (kg)"             className="field num text-xl"
             value={f.gross_kg}
             onChange={(e) => setF((s) => ({ ...s, gross_kg: e.target.value }))}
             inputMode="decimal"

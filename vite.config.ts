@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'Bristol Proteins & Oils — Production Ledger',
         short_name: 'Bristol Ledger',
         description: 'Production ledger for Bristol Proteins & Oils',
-        theme_color: '#2f7d75',
+        theme_color: '#1a293c',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

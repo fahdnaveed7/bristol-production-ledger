@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
-import { useProfiles } from '../lib/hooks'
+import { useProfiles, useRealtime } from '../lib/hooks'
 import type { ShiftReport } from '../lib/types'
 import { kg, pct, dateStr, dateTimeStr } from '../lib/format'
 import { EmptyState, Notice, PageHeader } from '../components/ui'
@@ -10,10 +10,12 @@ export function Reports() {
   const [reports, setReports] = useState<ShiftReport[]>([])
   const [selected, setSelected] = useState<ShiftReport | null>(null)
 
-  async function load() {
+  const load = useCallback(async () => {
     const { data } = await supabase.from('shift_report').select('*').order('generated_at', { ascending: false })
     setReports((data as ShiftReport[]) ?? [])
-  }
+    setSelected((current) => current ? (data ?? []).find((r) => r.id === current.id) ?? current : null)
+  }, [])
+  useRealtime(['shift_report'], load)
   useEffect(() => {
     void load()
   }, [])
@@ -76,12 +78,13 @@ function ReportDetail({ report: r, onBack }: { report: ShiftReport; onBack: () =
   const [verifiedBy, setVerifiedBy] = useState(r.verified_by)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => setVerifiedBy(r.verified_by), [r.verified_by])
   const canVerify = role === 'qc' || role === 'manager'
 
   async function verify() {
     setBusy(true)
     setMsg(null)
-    const { error } = await supabase.from('shift_report').update({ verified_by: profile!.id }).eq('id', r.id)
+    const { error } = await supabase.from('shift_report').update({ verified_by: profile!.id }).eq('id', r.id).is('verified_by', null).select().single()
     if (error) setMsg(error.message)
     else {
       setVerifiedBy(profile!.id)
@@ -91,7 +94,7 @@ function ReportDetail({ report: r, onBack }: { report: ShiftReport; onBack: () =
   }
 
   function downloadCsv() {
-    const blob = new Blob([csvFor(r)], { type: 'text/csv' })
+    const blob = new Blob(['\uFEFF' + csvFor(r)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -130,7 +133,7 @@ function ReportDetail({ report: r, onBack }: { report: ShiftReport; onBack: () =
 
       {msg && (
         <div className="mb-4 no-print">
-          <Notice tone="success">{msg}</Notice>
+          <Notice tone={msg === "Report verified" ? "success" : "error"}>{msg}</Notice>
         </div>
       )}
 

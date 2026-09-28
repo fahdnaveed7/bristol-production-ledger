@@ -12,6 +12,7 @@ import { ExportPanel } from '../components/ExportPanel'
 export function Dashboard() {
   const { profile } = useAuth()
   const { shift } = useOpenShift()
+  const [error, setError] = useState('')
   const [totals, setTotals] = useState<ShiftTotals | null>(null)
   const [received, setReceived] = useState<Grn[]>([])
   const [flags, setFlags] = useState<Grn[]>([])
@@ -45,25 +46,29 @@ export function Dashboard() {
   }, [shift])
 
   useEffect(() => {
-    void load()
+    const refresh = () => { void load().then(() => setError('')).catch((e) => setError(e.message)) }
+    refresh()
+    const timer = window.setInterval(refresh, 20000)
     const ch = supabase
       .channel('dash')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'grn' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batch' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batch_output' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'grn_pricing' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'grn' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batch' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batch_output' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'grn_pricing' }, refresh)
       .subscribe()
     return () => {
+      window.clearInterval(timer)
       void supabase.removeChannel(ch)
     }
   }, [load])
 
   async function saveRate(g: Grn, rate: number) {
     const amount = (g.net_kg ?? 0) * rate
-    await supabase.from('grn_pricing').upsert(
+    const { error } = await supabase.from('grn_pricing').upsert(
       { grn_id: g.id, rate_per_kg: rate, amount, entered_by: profile!.id, entered_at: new Date().toISOString() },
       { onConflict: 'grn_id' },
     )
+    if (error) throw error
     await load()
   }
 
@@ -73,6 +78,7 @@ export function Dashboard() {
     <>
       <PageHeader title="Dashboard" subtitle={shift ? `Live · ${shift.label} shift · ${shift.business_date}` : 'No shift running right now'} />
 
+      {error && <Notice tone="error">{error}</Notice>}
       {/* 1 · Right now */}
       <h2 className="font-bold text-gray-900 mb-2">Right now</h2>
       {!shift ? (
@@ -150,21 +156,26 @@ export function Dashboard() {
 function RateRow({ grn, pricing, onSave }: { grn: Grn; pricing?: GrnPricing; onSave: (rate: number) => Promise<void> }) {
   const [rate, setRate] = useState(pricing?.rate_per_kg?.toString() ?? '')
   const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  useEffect(() => { setRate(pricing?.rate_per_kg?.toString() ?? '') }, [pricing?.rate_per_kg])
   const amount = (grn.net_kg ?? 0) * (Number(rate) || 0)
 
   async function save() {
     const r = Number(rate)
-    if (!r || r <= 0) return
+    if (!Number.isFinite(r) || r < 0 || !rate.trim()) return setMessage('What is the rate per kg?')
     setBusy(true)
     try {
       await onSave(r)
+      setMessage('Rate saved')
+    } catch (e) {
+      setMessage((e as Error).message)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div><div className="flex flex-wrap items-center gap-2">
       <div className="min-w-0 flex-1">
         <div className="font-medium text-sm truncate">{grn.vehicle_no}</div>
         <div className="text-xs text-gray-500 num">net {kg(grn.net_kg)} kg</div>
@@ -175,11 +186,12 @@ function RateRow({ grn, pricing, onSave }: { grn: Grn; pricing?: GrnPricing; onS
         onChange={(e) => setRate(e.target.value)}
         inputMode="decimal"
         placeholder="rate/kg"
+        aria-label={`Rate per kg for ${grn.vehicle_no}`}
       />
       <div className="num text-sm font-semibold w-24 text-right">{money(amount)}</div>
       <button className="btn-primary py-2 text-sm shrink-0" onClick={save} disabled={busy}>
         {busy ? '…' : 'Save'}
       </button>
-    </div>
+    </div>{message && <p role="status" className="mt-2 text-sm text-amber-800">{message}</p>}</div>
   )
 }

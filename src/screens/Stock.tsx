@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchStock, type StockDay } from '../lib/stock'
 import { useRealtime } from '../lib/hooks'
 import { kg, dateStr } from '../lib/format'
-import { EmptyState, PageHeader, Stat } from '../components/ui'
+import { EmptyState, PageHeader, Stat, Notice } from '../components/ui'
 
 export function Stock() {
+  const [error, setError] = useState('')
   const [days, setDays] = useState<StockDay[]>([])
   const [totals, setTotals] = useState<StockDay | null>(null)
 
@@ -12,7 +13,7 @@ export function Stock() {
     fetchStock().then(({ days, totals }) => {
       setDays(days)
       setTotals(totals)
-    })
+    }).catch((e) => setError(e.message))
   }, [])
 
   useEffect(() => load(), [load])
@@ -22,6 +23,7 @@ export function Stock() {
     <>
       <PageHeader title="Stock register" subtitle="Everything produced, with the date it was made" />
 
+      {error && <Notice tone="error">{error}</Notice>}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <Stat label="Fishmeal bags" value={totals ? String(totals.fishmealBags) : '—'} hint="total in register" accent />
         <Stat label="Fishmeal" value={kg(totals?.fishmealKg)} hint="kg total" />

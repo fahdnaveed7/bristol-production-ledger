@@ -21,7 +21,7 @@ export function Login() {
         setNames(n)
         if (n[0]) setName(n[0])
       })
-      .catch(() => setNames([]))
+      .catch(() => setError('Could not load the staff list. Can you check the internet and try again?'))
   }, [])
 
   function press(d: string) {
@@ -88,7 +88,7 @@ export function Login() {
             <div className="mb-4">
               <label className="label">Your name</label>
               {names.length ? (
-                <select className="field" value={name} onChange={(e) => setName(e.target.value)}>
+                <select aria-label="Your name" className="field" value={name} onChange={(e) => setName(e.target.value)}>
                   {names.map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -103,6 +103,7 @@ export function Login() {
             <div className="mb-4">
               <label className="label">Your name</label>
               <input
+                aria-label="Your name"
                 className="field"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -113,7 +114,8 @@ export function Login() {
             </div>
           )}
 
-          <label className="label">6-digit PIN</label>
+          <label className="label" htmlFor="staff-pin">6-digit PIN</label>
+          <input id="staff-pin" className="sr-only" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={(e) => { if (e.key === 'Enter') void submit() }} />
           <div className="flex justify-center gap-2 mb-4">
             {Array.from({ length: PIN_LEN }).map((_, i) => (
               <div
@@ -133,7 +135,7 @@ export function Login() {
                 {d}
               </button>
             ))}
-            <button className="btn-ghost text-sm py-4" onClick={backspace}>
+            <button aria-label="Backspace" className="btn-ghost text-sm py-4" onClick={backspace}>
               ⌫
             </button>
             <button className="btn-ghost text-xl py-4" onClick={() => press('0')}>

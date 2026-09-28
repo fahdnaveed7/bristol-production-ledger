@@ -8,16 +8,19 @@ export interface PendingMutation {
   op: 'insert' | 'update'
   rowId: string // primary key of the affected row
   payload: Record<string, unknown>
+  userId?: string
   createdAt: number
 }
 
 class LedgerDB extends Dexie {
   mutations!: Table<PendingMutation, string>
+  cache!: Table<{ key: string; rows: unknown[] }, string>
   constructor() {
     super('bristol-ledger')
     this.version(1).stores({
       mutations: 'id, table, rowId, createdAt',
     })
+    this.version(2).stores({ mutations: 'id, table, rowId, createdAt', cache: 'key' })
   }
 }
 

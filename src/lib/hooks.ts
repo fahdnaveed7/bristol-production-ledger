@@ -10,6 +10,8 @@ export function useOpenShift() {
   const reload = useCallback(async () => {
     try {
       setShift(await getOpenShift())
+    } catch {
+      // Keep the last known shift while the device reconnects.
     } finally {
       setLoading(false)
     }
@@ -17,11 +19,13 @@ export function useOpenShift() {
 
   useEffect(() => {
     void reload()
+    window.addEventListener('online', reload)
     const ch = supabase
       .channel('open-shift')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shift' }, () => void reload())
       .subscribe()
     return () => {
+      window.removeEventListener('online', reload)
       void supabase.removeChannel(ch)
     }
   }, [reload])

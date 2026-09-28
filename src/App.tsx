@@ -21,7 +21,8 @@ function Protected({ allow, children }: { allow: Role[]; children: React.ReactNo
   const loc = useLocation()
   if (loading) return <Splash />
   if (!session) return <Navigate to="/login" state={{ from: loc }} replace />
-  if (role && !allow.includes(role)) return <Navigate to={landingPath(role)} replace />
+  if (!role) return <div className="p-8 text-center"><p>We couldn’t load your staff role. Can you reconnect and try again?</p><button className="btn-primary mt-4" onClick={() => window.location.reload()}>Try again</button></div>
+  if (!allow.includes(role)) return <Navigate to={landingPath(role)} replace />
   return <Layout>{children}</Layout>
 }
 

@@ -1,3 +1,6 @@
+import { readAll } from './read'
+import { cachedRows } from '../offline/cache'
+import { CAPTURE_CHANGED } from '../offline/queue'
 import { supabase } from './supabase'
 import { queuedWrite } from '../offline/queue'
 import { uuid } from './format'
@@ -68,11 +71,10 @@ export async function saveTare(grnId: string, tare_kg: number): Promise<{ queued
   return queuedWrite('grn', 'update', { id: grnId, tare_kg, status: 'weighed_tare' })
 }
 
-export async function markReceived(grnId: string, receiving_by: string): Promise<{ queued: boolean }> {
+export async function markReceived(grnId: string): Promise<{ queued: boolean }> {
   return queuedWrite('grn', 'update', {
     id: grnId,
     status: 'received',
-    receiving_by,
     received_at: new Date().toISOString(),
   })
 }
@@ -83,19 +85,22 @@ export async function rejectGrn(grnId: string, remarks: string): Promise<{ queue
 
 export function subscribeGrn(onChange: (rows: Grn[]) => void) {
   const load = async () => {
-    const { data } = await supabase
+    const data = await cachedRows<Grn>('grn', readAll(supabase
       .from('grn')
       .select('*')
       .order('arrived_at', { ascending: false })
-      .limit(200)
+      ), 'grn')
     onChange((data as Grn[]) ?? [])
   }
-  void load()
+  const reload = () => { void load().catch(() => {}) }
+  reload()
+  window.addEventListener(CAPTURE_CHANGED, reload)
   const ch = supabase
     .channel('grn-feed')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'grn' }, () => void load())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'grn' }, reload)
     .subscribe()
   return () => {
+    window.removeEventListener(CAPTURE_CHANGED, reload)
     void supabase.removeChannel(ch)
   }
 }

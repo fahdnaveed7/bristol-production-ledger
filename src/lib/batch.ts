@@ -1,3 +1,6 @@
+import { readAll } from './read'
+import { cachedRows } from '../offline/cache'
+import { CAPTURE_CHANGED } from '../offline/queue'
 import { supabase } from './supabase'
 import { queuedWrite } from '../offline/queue'
 import { uuid } from './format'
@@ -38,6 +41,7 @@ export async function addOutput(input: {
     bags: input.bags,
     kg_per_bag: input.kg_per_bag,
     total_kg: input.total_kg,
+    created_at: new Date().toISOString(),
   })
 }
 
@@ -46,26 +50,22 @@ export function subscribeShiftBatches(
   onChange: (batches: Batch[], outputs: BatchOutput[]) => void,
 ) {
   const load = async () => {
-    const { data: batches } = await supabase
-      .from('batch')
-      .select('*')
-      .eq('shift_id', shiftId)
-      .order('started_at', { ascending: false })
-    const ids = (batches as Batch[] | null ?? []).map((b) => b.id)
-    let outputs: BatchOutput[] = []
-    if (ids.length) {
-      const { data: out } = await supabase.from('batch_output').select('*').in('batch_id', ids)
-      outputs = (out as BatchOutput[] | null) ?? []
-    }
-    onChange((batches as Batch[]) ?? [], outputs)
+    const allBatches = await cachedRows<Batch>(`batch-${shiftId}`, readAll(supabase.from('batch').select('*').eq('shift_id', shiftId).order('started_at', { ascending: false })), 'batch')
+    const batches = allBatches.filter((b) => b.shift_id === shiftId).sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? ''))
+    const ids = batches.map((b) => b.id)
+    const outputs = ids.length ? await cachedRows<BatchOutput>(`outputs-${shiftId}`, readAll(supabase.from('batch_output').select('*').in('batch_id', ids).order('id')), 'batch_output') : []
+    onChange(batches, outputs.filter((o) => ids.includes(o.batch_id)))
   }
-  void load()
+  const reload = () => { void load().catch(() => {}) }
+  reload()
+  window.addEventListener(CAPTURE_CHANGED, reload)
   const ch = supabase
     .channel(`batches-${shiftId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'batch' }, () => void load())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'batch_output' }, () => void load())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'batch' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'batch_output' }, reload)
     .subscribe()
   return () => {
+    window.removeEventListener(CAPTURE_CHANGED, reload)
     void supabase.removeChannel(ch)
   }
 }
