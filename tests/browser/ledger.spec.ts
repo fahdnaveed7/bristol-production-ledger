@@ -186,3 +186,13 @@ test('phone layout has no overflow at 390px', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: 'test-results/production-mobile.png', fullPage: true })
 })
+
+
+test('unreachable staff directory shows a connection error, not an empty directory', async ({ page }) => {
+  await page.route('https://ledger-test.supabase.co/**', (route) => route.abort('namenotresolved'))
+  await page.goto('/login')
+  await expect(page.getByText('Could not connect to the staff directory.')).toBeVisible()
+  await expect(page.getByText('No staff yet — use Register.')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Enter', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+})

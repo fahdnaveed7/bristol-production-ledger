@@ -9,20 +9,25 @@ export function Login() {
   const nav = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [names, setNames] = useState<string[]>([])
+  const [staffState, setStaffState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [name, setName] = useState('')
   const [newName, setNewName] = useState('')
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    listStaffNames()
-      .then((n) => {
-        setNames(n)
-        if (n[0]) setName(n[0])
-      })
-      .catch(() => setError('Could not load the staff list. Can you check the internet and try again?'))
-  }, [])
+  async function loadNames() {
+    setStaffState('loading')
+    try {
+      const staff = await listStaffNames()
+      setNames(staff)
+      setName(staff[0] ?? '')
+      setStaffState('ready')
+    } catch {
+      setStaffState('error')
+    }
+  }
+  useEffect(() => { void loadNames() }, [])
 
   function press(d: string) {
     setError(null)
@@ -87,7 +92,14 @@ export function Login() {
           {mode === 'login' ? (
             <div className="mb-4">
               <label className="label">Your name</label>
-              {names.length ? (
+              {staffState === 'loading' ? (
+                <p role="status" className="text-sm text-gray-500">Loading staff names…</p>
+              ) : staffState === 'error' ? (
+                <div role="alert">
+                  <p className="text-sm text-amber-800">Could not connect to the staff directory. Can you check the connection and try again?</p>
+                  <button className="btn-ghost mt-2 w-full" onClick={() => void loadNames()}>Try again</button>
+                </div>
+              ) : names.length ? (
                 <select aria-label="Your name" className="field" value={name} onChange={(e) => setName(e.target.value)}>
                   {names.map((n) => (
                     <option key={n} value={n}>
@@ -141,7 +153,7 @@ export function Login() {
             <button className="btn-ghost text-xl py-4" onClick={() => press('0')}>
               0
             </button>
-            <button className="btn-primary py-4" onClick={submit} disabled={busy}>
+            <button className="btn-primary py-4" onClick={submit} disabled={busy || (mode === 'login' && (staffState !== 'ready' || !name))}>
               {busy ? '…' : mode === 'login' ? 'Enter' : 'Create'}
             </button>
           </div>
