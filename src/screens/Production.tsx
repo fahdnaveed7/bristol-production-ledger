@@ -60,7 +60,7 @@ function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: 
   async function submit() {
     setMsg(null)
     const n = Number(fed)
-    if (!n || n <= 0) return setMsg('How many kg went into the plant?')
+    if (!Number.isFinite(n) || n <= 0) return setMsg('How many kg went into the plant?')
     setBusy(true)
     try {
       const { queued } = await createBatch({
@@ -75,6 +75,7 @@ function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: 
       setMsg(queued ? 'Saved on this device — will send when internet is back' : null)
     } catch (e) {
       setMsg((e as Error).message)
+      return false
     } finally {
       setBusy(false)
     }
@@ -87,11 +88,11 @@ function FeedForm({ shiftId, profileId, nextNo }: { shiftId: string; profileId: 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Kg fed</label>
-          <input className="field num text-xl" value={fed} onChange={(e) => setFed(e.target.value)} inputMode="decimal" placeholder="15000" />
+          <input aria-label="Kg fed" className="field num text-xl" value={fed} onChange={(e) => setFed(e.target.value)} inputMode="decimal" placeholder="15000" />
         </div>
         <div>
           <label className="label">Fish type (optional)</label>
-          <input className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sardine" />
+          <input aria-label="Fish type (optional)" className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Sardine" />
         </div>
       </div>
       <button className="btn-primary w-full mt-3" onClick={submit} disabled={busy}>
@@ -109,7 +110,7 @@ function useOutputSubmit(latestBatch: Batch | null, product: Product) {
 
   async function submit(vals: { bags: number | null; kg_per_bag: number | null; total_kg: number }) {
     setMsg(null)
-    if (!latestBatch) return
+    if (!latestBatch) return false
     setBusy(true)
     try {
       const { queued } = await addOutput({
@@ -120,8 +121,10 @@ function useOutputSubmit(latestBatch: Batch | null, product: Product) {
         total_kg: vals.total_kg,
       })
       setMsg(queued ? 'Saved on this device — will send when internet is back' : 'Added to stock ✓')
+      return true
     } catch (e) {
       setMsg((e as Error).message)
+      return false
     } finally {
       setBusy(false)
     }
@@ -139,14 +142,14 @@ function MealOutForm({ latestBatch }: { latestBatch: Batch | null }) {
   const liveKg = mode === 'bags' ? (Number(bags) || 0) * (Number(perBag) || 0) : Number(totalKg) || 0
 
   async function onSave() {
-    if (liveKg <= 0) return setMsg(mode === 'bags' ? 'How many bags?' : 'How many kg?')
-    await submit({
+    if (mode === 'bags' && !Number.isInteger(Number(bags))) return setMsg('How many whole bags?')
+    if (!Number.isFinite(liveKg) || liveKg <= 0) return setMsg(mode === 'bags' ? 'How many bags?' : 'How many kg?')
+    const saved = await submit({
       bags: mode === 'bags' ? Number(bags) : null,
       kg_per_bag: mode === 'bags' ? Number(perBag) : null,
       total_kg: liveKg,
     })
-    setBags('')
-    setTotalKg('')
+    if (saved) { setBags(''); setTotalKg('') }
   }
 
   return (
@@ -157,11 +160,11 @@ function MealOutForm({ latestBatch }: { latestBatch: Batch | null }) {
         <div className="grid grid-cols-2 gap-2 mb-2">
           <div>
             <label className="label">Bags</label>
-            <input className="field num py-2" value={bags} onChange={(e) => setBags(e.target.value)} inputMode="numeric" placeholder="60" />
+            <input aria-label="Bags" className="field num py-2" value={bags} onChange={(e) => setBags(e.target.value)} inputMode="numeric" placeholder="60" />
           </div>
           <div>
             <label className="label">Kg per bag</label>
-            <select className="field num py-2" value={perBag} onChange={(e) => setPerBag(e.target.value)}>
+            <select aria-label="Kg per bag" className="field num py-2" value={perBag} onChange={(e) => setPerBag(e.target.value)}>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
@@ -170,7 +173,7 @@ function MealOutForm({ latestBatch }: { latestBatch: Batch | null }) {
       ) : (
         <div className="mb-2">
           <label className="label">Total kg</label>
-          <input className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" />
+          <input aria-label="Total kg" className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" />
         </div>
       )}
       <button className="text-xs text-gray-400 underline mb-2" onClick={() => setMode(mode === 'bags' ? 'kg' : 'bags')}>
@@ -196,9 +199,8 @@ function OilOutForm({ latestBatch }: { latestBatch: Batch | null }) {
   const liveKg = Number(totalKg) || 0
 
   async function onSave() {
-    if (liveKg <= 0) return setMsg('How many kg of oil?')
-    await submit({ bags: null, kg_per_bag: null, total_kg: liveKg })
-    setTotalKg('')
+    if (!Number.isFinite(liveKg) || liveKg <= 0) return setMsg('How many kg of oil?')
+    if (await submit({ bags: null, kg_per_bag: null, total_kg: liveKg })) setTotalKg('')
   }
 
   return (
@@ -207,7 +209,7 @@ function OilOutForm({ latestBatch }: { latestBatch: Batch | null }) {
       <p className="text-xs text-gray-500 mb-3">Measured in kg, goes into the stock register</p>
       <div className="mb-2">
         <label className="label">Kg of oil</label>
-        <input className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" placeholder="750" />
+        <input aria-label="Kg of oil" className="field num py-2" value={totalKg} onChange={(e) => setTotalKg(e.target.value)} inputMode="decimal" placeholder="750" />
       </div>
       {liveKg > 0 && (
         <p className="text-sm text-gray-700 mb-2">
@@ -236,7 +238,7 @@ function ShiftLog({ batches, outputs }: { batches: Batch[]; outputs: BatchOutput
       ) : (
         <div className="space-y-3">
           {chrono.map((b) => {
-            const outs = outputs.filter((o) => o.batch_id === b.id)
+            const outs = outputs.filter((o) => o.batch_id === b.id && ACTIVE_PRODUCTS.includes(o.product))
             return (
               <div key={b.id} className="border-l-2 border-navy-light pl-3">
                 <div className="text-sm">

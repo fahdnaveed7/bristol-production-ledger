@@ -9,20 +9,25 @@ export function Login() {
   const nav = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [names, setNames] = useState<string[]>([])
+  const [staffState, setStaffState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [name, setName] = useState('')
   const [newName, setNewName] = useState('')
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    listStaffNames()
-      .then((n) => {
-        setNames(n)
-        if (n[0]) setName(n[0])
-      })
-      .catch(() => setNames([]))
-  }, [])
+  async function loadNames() {
+    setStaffState('loading')
+    try {
+      const staff = await listStaffNames()
+      setNames(staff)
+      setName(staff[0] ?? '')
+      setStaffState('ready')
+    } catch {
+      setStaffState('error')
+    }
+  }
+  useEffect(() => { void loadNames() }, [])
 
   function press(d: string) {
     setError(null)
@@ -87,8 +92,15 @@ export function Login() {
           {mode === 'login' ? (
             <div className="mb-4">
               <label className="label">Your name</label>
-              {names.length ? (
-                <select className="field" value={name} onChange={(e) => setName(e.target.value)}>
+              {staffState === 'loading' ? (
+                <p role="status" className="text-sm text-gray-500">Loading staff names…</p>
+              ) : staffState === 'error' ? (
+                <div role="alert">
+                  <p className="text-sm text-amber-800">Could not connect to the staff directory. Can you check the connection and try again?</p>
+                  <button className="btn-ghost mt-2 w-full" onClick={() => void loadNames()}>Try again</button>
+                </div>
+              ) : names.length ? (
+                <select aria-label="Your name" className="field" value={name} onChange={(e) => setName(e.target.value)}>
                   {names.map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -103,6 +115,7 @@ export function Login() {
             <div className="mb-4">
               <label className="label">Your name</label>
               <input
+                aria-label="Your name"
                 className="field"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -113,7 +126,8 @@ export function Login() {
             </div>
           )}
 
-          <label className="label">6-digit PIN</label>
+          <label className="label" htmlFor="staff-pin">6-digit PIN</label>
+          <input id="staff-pin" className="sr-only" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={(e) => { if (e.key === 'Enter') void submit() }} />
           <div className="flex justify-center gap-2 mb-4">
             {Array.from({ length: PIN_LEN }).map((_, i) => (
               <div
@@ -133,13 +147,13 @@ export function Login() {
                 {d}
               </button>
             ))}
-            <button className="btn-ghost text-sm py-4" onClick={backspace}>
+            <button aria-label="Backspace" className="btn-ghost text-sm py-4" onClick={backspace}>
               ⌫
             </button>
             <button className="btn-ghost text-xl py-4" onClick={() => press('0')}>
               0
             </button>
-            <button className="btn-primary py-4" onClick={submit} disabled={busy}>
+            <button className="btn-primary py-4" onClick={submit} disabled={busy || (mode === 'login' && (staffState !== 'ready' || !name))}>
               {busy ? '…' : mode === 'login' ? 'Enter' : 'Create'}
             </button>
           </div>

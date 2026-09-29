@@ -9,18 +9,23 @@ import { onQueueChange } from '../offline/queue'
 function OfflineChip() {
   const [online, setOnline] = useState(navigator.onLine)
   const [pending, setPending] = useState(0)
+  const [error, setError] = useState('')
   useEffect(() => {
     const on = () => setOnline(true)
     const off = () => setOnline(false)
     window.addEventListener('online', on)
     window.addEventListener('offline', off)
+    const failed = (event: Event) => setError((event as CustomEvent<string>).detail)
+    window.addEventListener('ledger-sync-error', failed)
     const unsub = onQueueChange(setPending)
     return () => {
       window.removeEventListener('online', on)
       window.removeEventListener('offline', off)
       unsub()
+      window.removeEventListener('ledger-sync-error', failed)
     }
   }, [])
+  if (error) return <button className="text-sm text-red-700" onClick={() => setError('')} title="Dismiss">A saved record was not sent: {error}</button>
   if (online && pending === 0) return null
   return (
     <span className={`badge ${online ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'}`}>
@@ -42,7 +47,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-full md:flex">
       {/* Desktop left rail */}
-      <aside className="hidden md:flex md:flex-col md:w-56 md:shrink-0 border-r border-gray-200 bg-white">
+      <aside className="no-print hidden md:flex md:flex-col md:w-56 md:shrink-0 border-r border-gray-200 bg-white">
         <div className="px-4 py-4 border-b border-gray-200 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gold text-white grid place-items-center text-base font-bold shrink-0">B</div>
           <div className="min-w-0">
@@ -50,7 +55,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="text-xs text-gray-400">Production Ledger</div>
           </div>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="no-print flex-1 p-2 space-y-1">
           {items.map((n) => (
             <NavLink
               key={n.path}
@@ -77,7 +82,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
+        <header className="no-print md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="font-bold text-navy text-sm">Bristol Ledger</div>
           <div className="flex items-center gap-2">
             <OfflineChip />
@@ -87,14 +92,14 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className="hidden md:flex items-center justify-end px-6 py-2 gap-2">
+        <div className="no-print hidden md:flex items-center justify-end px-6 py-2 gap-2">
           <OfflineChip />
         </div>
 
         <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6 max-w-3xl w-full mx-auto">{children}</main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 grid grid-flow-col auto-cols-fr z-10">
+        <nav className="no-print md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 grid grid-flow-col auto-cols-fr z-10">
           {items.map((n) => (
             <NavLink
               key={n.path}

@@ -4,84 +4,83 @@ import { db, type PendingMutation } from './db'
 
 type Listener = (pending: number) => void
 const listeners = new Set<Listener>()
+export const CAPTURE_CHANGED = 'ledger-capture-changed'
 
 export function onQueueChange(fn: Listener): () => void {
   listeners.add(fn)
   void notify()
-  return () => listeners.delete(fn)
+  return () => { listeners.delete(fn) }
 }
-
 async function notify() {
   const n = await db.mutations.count()
   listeners.forEach((l) => l(n))
+  window.dispatchEvent(new Event(CAPTURE_CHANGED))
 }
-
-function isNetworkError(err: unknown): boolean {
+export function isNetworkError(err: unknown): boolean {
   if (!navigator.onLine) return true
   const msg = (err as { message?: string })?.message?.toLowerCase() ?? ''
-  return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('timeout')
+  return /fetch|network|timeout|load failed|connection/.test(msg)
 }
-
 async function apply(m: Pick<PendingMutation, 'table' | 'op' | 'payload'>) {
-  if (m.op === 'insert') {
-    // upsert (not insert) so a replayed insert never duplicates the row.
-    return supabase.from(m.table).upsert(m.payload as never, { onConflict: 'id' })
-  }
-  const { id, ...rest } = m.payload as { id: string } & Record<string, unknown>
-  return supabase.from(m.table).update(rest as never).eq('id', id)
+  // Generated columns are read-only, even when a cached row is passed by mistake.
+  const { net_kg: _net, avg_box_kg: _avg, sampled_estimate_kg: _estimate, ...payload } = m.payload
+  if (m.op === 'insert') return supabase.from(m.table).upsert(payload, { onConflict: 'id' })
+  const { id, ...rest } = payload
+  return supabase.from(m.table).update(rest).eq('id', id).select('id').single()
 }
 
-// Try to write live; on a network failure, queue it and report success optimistically.
-// Returns { queued: true } when the write went to the offline queue.
+// Persist before sending. One ordered drain prevents an online update overtaking
+// its queued parent insert, and prevents duplicate concurrent replays.
 export async function queuedWrite(
-  table: PendingMutation['table'],
-  op: PendingMutation['op'],
+  table: PendingMutation['table'], op: PendingMutation['op'],
   payload: Record<string, unknown> & { id: string },
 ): Promise<{ queued: boolean }> {
-  if (navigator.onLine) {
-    const { error } = await apply({ table, op, payload })
-    if (!error) return { queued: false }
-    if (!isNetworkError(error)) throw error
-  }
-  const m: PendingMutation = {
-    id: uuid(),
-    table,
-    op,
-    rowId: payload.id,
-    payload,
-    createdAt: Date.now(),
-  }
-  await db.mutations.add(m)
+  const { data } = await supabase.auth.getSession()
+  if (!data.session) throw new Error('Can you sign in before recording?')
+  const id = uuid()
+  await db.mutations.add({ id, table, op, rowId: payload.id, payload,
+    userId: data.session.user.id, createdAt: Date.now() })
   await notify()
-  return { queued: true }
+  const errors = await flushQueue()
+  if (errors.has(id)) throw new Error(errors.get(id))
+  return { queued: !!(await db.mutations.get(id)) }
 }
-
-let flushing = false
-
-export async function flushQueue(): Promise<void> {
-  if (flushing || !navigator.onLine) return
-  flushing = true
-  try {
-    const pending = await db.mutations.orderBy('createdAt').toArray()
-    for (const m of pending) {
+let draining: Promise<Map<string, string>> | null = null
+export function flushQueue(): Promise<Map<string, string>> {
+  if (draining) return draining
+  draining = drain().finally(() => { draining = null })
+  return draining
+}
+async function drain(): Promise<Map<string, string>> {
+  const errors = new Map<string, string>()
+  if (!navigator.onLine) return errors
+  const { data } = await supabase.auth.getSession()
+  if (!data.session) return errors
+  const userId = data.session.user.id
+  const pending = await db.mutations.orderBy('createdAt').toArray()
+  for (const m of pending) {
+    // Shared phones must never replay another person's saved writes under this login.
+    if (m.userId && m.userId !== userId) continue
+    try {
       const { error } = await apply(m)
-      if (error) {
-        if (isNetworkError(error)) break // stay queued, retry later
-        // Non-network error (e.g. RLS/validation): drop it so the queue can't wedge.
-        // eslint-disable-next-line no-console
-        console.error('Dropping unrecoverable queued mutation', m, error)
-      }
-      await db.mutations.delete(m.id)
-      await notify()
+      if (error) throw error
+    } catch (error) {
+      if (isNetworkError(error)) break
+      const message = (error as Error).message || 'A saved record could not be sent.'
+      errors.set(m.id, message)
+      window.dispatchEvent(new CustomEvent('ledger-sync-error', { detail: message }))
     }
-  } finally {
-    flushing = false
+    await db.mutations.delete(m.id)
+    await notify()
   }
+  return errors
 }
-
 export function startQueueSync() {
-  window.addEventListener('online', () => void flushQueue())
-  // Periodic safety net in case an 'online' event is missed.
-  window.setInterval(() => void flushQueue(), 20_000)
-  void flushQueue()
+  const sync = () => { void flushQueue().catch((error) => {
+    window.dispatchEvent(new CustomEvent('ledger-sync-error', { detail: (error as Error).message }))
+  }) }
+  window.addEventListener('online', sync)
+  window.setInterval(sync, 20_000)
+  supabase.auth.onAuthStateChange(() => { window.setTimeout(sync, 0) })
+  sync()
 }

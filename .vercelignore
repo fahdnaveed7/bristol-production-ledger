@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+node_modules
+.previous-node-modules
+test-results
+playwright-report
+tests
+supabase

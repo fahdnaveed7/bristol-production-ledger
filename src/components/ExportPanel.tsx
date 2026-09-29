@@ -24,6 +24,8 @@ export function ExportPanel() {
   const [busy, setBusy] = useState<Key | null>(null)
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
+  const invalidRange = !!(range.from && range.to && range.from > range.to)
+
   async function run(d: (typeof DATASETS)[number]) {
     setBusy(d.key)
     setMsg(null)
@@ -50,18 +52,20 @@ export function ExportPanel() {
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className="label">From</label>
-          <input className="field num py-2" type="date" value={range.from ?? ''} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value || undefined }))} />
+          <input aria-label="From" className="field num py-2" type="date" value={range.from ?? ''} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value || undefined }))} />
         </div>
         <div>
           <label className="label">To</label>
-          <input className="field num py-2" type="date" value={range.to ?? ''} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value || undefined }))} />
+          <input aria-label="To" className="field num py-2" type="date" value={range.to ?? ''} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value || undefined }))} />
         </div>
       </div>
+
+      {invalidRange && <p role="alert" className="text-red-700 mb-3">Can you choose a To date on or after From?</p>}
 
       {/* The headline export: one formatted workbook with everything */}
       <button
         className="btn-primary w-full flex-col items-start text-left py-3 h-auto mb-3"
-        disabled={busy != null}
+        disabled={busy != null || invalidRange}
         onClick={async () => {
           setBusy('excel')
           setMsg(null)
@@ -82,7 +86,7 @@ export function ExportPanel() {
       <p className="label">Or single files (CSV)</p>
       <div className="grid sm:grid-cols-2 gap-2">
         {DATASETS.map((d) => (
-          <button key={d.key} className="btn-ghost flex-col items-start text-left py-3 h-auto" onClick={() => run(d)} disabled={busy != null}>
+          <button key={d.key} className="btn-ghost flex-col items-start text-left py-3 h-auto" onClick={() => run(d)} disabled={busy != null || invalidRange}>
             <span className="font-semibold text-navy">{busy === d.key ? 'Preparing…' : `⬇ ${d.label}`}</span>
             <span className="text-xs font-normal text-gray-500">{d.hint}</span>
           </button>

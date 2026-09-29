@@ -125,7 +125,7 @@ export function TruckCard({ grn, role, profileId }: { grn: Grn; role: Role; prof
                     {cur === 3 && (
                       <div className="space-y-2">
                         <CrossCheck grn={grn} />
-                        <button className="btn-primary w-full" disabled={busy} onClick={() => act(() => markReceived(grn.id, profileId))}>
+                        <button className="btn-primary w-full" disabled={busy} onClick={() => act(() => markReceived(grn.id))}>
                           {busy ? 'Saving…' : `Confirm received — ${kg(grn.net_kg)} kg`}
                         </button>
                       </div>
@@ -164,9 +164,9 @@ function BoxesForm({ grn, profileId, busy, act }: { grn: Grn; profileId: string;
 
   function save() {
     setErr(null)
-    if (nT <= 0) return setErr('How many boxes in total?')
-    if (nS <= 0) return setErr('How many boxes did you weigh?')
-    if (nW <= 0) return setErr('What did those boxes weigh?')
+    if (!Number.isInteger(nT) || nT <= 0) return setErr('How many boxes in total?')
+    if (!Number.isInteger(nS) || nS <= 0) return setErr('How many boxes did you weigh?')
+    if (!Number.isFinite(nW) || nW <= 0) return setErr('What did those boxes weigh?')
     if (nS > nT) return setErr('Sample can’t be more than the total')
     void act(() => saveSampling(grn.id, { total_boxes: nT, sample_boxes: nS, sample_weight_kg: nW, receiving_by: profileId }))
   }
@@ -176,15 +176,15 @@ function BoxesForm({ grn, profileId, busy, act }: { grn: Grn; profileId: string;
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="label">Total boxes</label>
-          <input className="field num py-2" value={total} onChange={(e) => setTotal(e.target.value)} inputMode="numeric" />
+          <input aria-label="Total boxes" className="field num py-2" value={total} onChange={(e) => setTotal(e.target.value)} inputMode="numeric" />
         </div>
         <div>
           <label className="label">Boxes weighed</label>
-          <input className="field num py-2" value={sboxes} onChange={(e) => setSboxes(e.target.value)} inputMode="numeric" placeholder="30" />
+          <input aria-label="Boxes weighed" className="field num py-2" value={sboxes} onChange={(e) => setSboxes(e.target.value)} inputMode="numeric" placeholder="30" />
         </div>
         <div>
           <label className="label">Their weight kg</label>
-          <input className="field num py-2" value={sweight} onChange={(e) => setSweight(e.target.value)} inputMode="decimal" placeholder="600" />
+          <input aria-label="Their weight kg" className="field num py-2" value={sweight} onChange={(e) => setSweight(e.target.value)} inputMode="decimal" placeholder="600" />
         </div>
       </div>
       {estimate != null && (
@@ -208,7 +208,7 @@ function TareForm({ grn, busy, act }: { grn: Grn; busy: boolean; act: (fn: () =>
 
   function save() {
     setErr(null)
-    if (nTare <= 0) return setErr('Enter the empty-truck weight')
+    if (!Number.isFinite(nTare) || nTare <= 0) return setErr('Enter the empty-truck weight')
     if (grn.gross_kg != null && nTare >= grn.gross_kg) return setErr('Empty weight must be less than the loaded weight')
     void act(() => saveTare(grn.id, nTare))
   }
@@ -217,7 +217,7 @@ function TareForm({ grn, busy, act }: { grn: Grn; busy: boolean; act: (fn: () =>
     <div className="space-y-2">
       <label className="label">Empty truck + boxes (kg)</label>
       <div className="flex gap-2">
-        <input className="field num py-2" value={tare} onChange={(e) => setTare(e.target.value)} inputMode="decimal" placeholder="e.g. 8940" />
+        <input aria-label="Empty truck + boxes (kg)" className="field num py-2" value={tare} onChange={(e) => setTare(e.target.value)} inputMode="decimal" placeholder="e.g. 8940" />
         <button className="btn-primary shrink-0" onClick={save} disabled={busy}>
           {busy ? '…' : 'Save'}
         </button>

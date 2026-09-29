@@ -1,106 +1,99 @@
 # Bristol Proteins & Oils — Production Ledger
 
-A multi-device PWA for the fishmeal plant floor. Weighbridge, receiving, production, QC and
-management each capture and see live data from their own devices. PIN-only login (no email
-fields), offline write-queue on the floor-capture screens, and Realtime for the manager
-dashboard.
+Phone-first React 18 / Vite / TypeScript / Tailwind PWA for truck receiving,
+plant feeds, fishmeal and fish oil output, stock, frozen reports, and manager pricing.
 
-## The material's journey
+## Run the existing app
 
-A truck is **one GRN record** that advances through states, each touched by a different role.
-The security gate stays on paper — its register serial is just typed in at the weighbridge as a
-cross-reference.
+The Supabase database and staff accounts already exist. **Do not run the reference
+schema, recreate tables, or truncate production data.** `supabase/schema.sql` is
+reference material only.
 
-```
-weighed_gross (weighbridge)  →  sampling (receiving)  →  weighed_tare (weighbridge)  →  received
-```
+1. Copy `.env.example` to `.env`.
+2. Set `VITE_SUPABASE_URL=https://wougpnmozbvrhnpkesjg.supabase.co` and the project's
+   publishable/anon key. Never use a service-role key. Do not commit `.env` or PINs.
+3. `npm ci`
+4. `npm run dev`
+5. Pick your name and enter your existing six-digit PIN.
 
-Two independent raw-material measures are stored — **weighbridge net** (`gross − tare`) and the
-**box-sample estimate** (`avg box × total boxes`). The app flags any truck where they diverge by
-more than 5% (configurable in `src/lib/yield.ts`).
+New registrations begin as weighbridge; managers change roles in Team. Permissions
+are enforced by the existing Supabase RLS policies, with additional navigation gates.
 
-## Shift engine (the reporting spine)
+## Workflows
 
-- 12-hour shifts, **day 08:00–20:00 / night 20:00–08:00**. At most one open shift at a time
-  (enforced by a partial unique index in the DB).
-- Every GRN / batch / output created while a shift is open auto-attaches to it.
-- Handover carries the balance: `opening = previous shift closing`, and
-  `closing = opening + received − fed`.
-- Closing a shift **freezes a `shift_report` snapshot** (received / fed / closing / meal-oil-FSP
-  output / three yields / verified-by). Later edits never rewrite history.
-- **Continuous peak season (24h for 10–15 days)** is just shifts chaining — close one, open the
-  next; the calendar date is incidental. Yield is computed at the **shift level** from all raw fed
-  and all output in the window, regardless of batch boundaries — so a continuous run still produces
-  a clean received/fed/output/yield report every 12 hours. Per-batch yield is shown only as an
-  *indicative* figure when a batch has both fed and output logged.
-
-## Rate lockdown
-
-Rate/kg is per truck (per GRN), entered **only by management** on the Dashboard, stored in a
-separate `grn_pricing` table with **no read policy for any other role** — invisible at the data
-layer everywhere else, even to a raw query.
-
-## Stack
-
-React 18 + Vite + TypeScript + Tailwind + React Router · `@supabase/supabase-js` · `dexie`
-(offline queue) · `vite-plugin-pwa`. The client uses the **anon key only**; RLS enforces
-everything. No service key is ever shipped to the browser.
-
-## Setup
-
-1. **Create a Supabase project.** Copy the project URL + anon key into `.env`:
-   ```
-   cp .env.example .env
-   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-   ```
-2. **Auth → Providers → Email:** turn **OFF** "Confirm email"; set minimum password length to 6.
-   (PINs are 6-digit passwords behind hidden `<name>@bristol.local` accounts.)
-3. **SQL Editor → run `supabase/schema.sql`.**
-4. **Install & run:**
-   ```
-   npm install
-   npm run dev
-   ```
-5. **Register yourself** in the app, then promote to manager in the SQL editor:
-   ```sql
-   update public.profiles set role = 'manager' where name = 'YOUR NAME';
-   ```
-6. **Log in as manager → Team →** set everyone else's roles.
-7. **Deploy** (Vercel / Netlify) with the same two env vars.
-
-## Roles & screens
-
-| Role         | Screens                                                        |
-|--------------|----------------------------------------------------------------|
-| weighbridge  | Trucks (steps ① weigh loaded, ③ weigh empty, ④ confirm)        |
-| receiving    | Trucks (step ② count & sample boxes)                           |
-| production   | Production (start/end shift, feed in, meal + oil out), Stock   |
-| qc           | Stock, Reports (verify locked shift reports)                   |
-| manager      | everything (incl. Dashboard, Team, rate entry, Excel export)   |
-
-Each truck is one card with a visible 4-step journey; if it's not your team's turn the card says
-who it's waiting for. Shift start/end lives in a banner on the work screens. Production output
-(fishmeal bags, fish oil kg) lands automatically in the **Stock register**, dated by production
-day. The manager Dashboard exports a formatted multi-sheet **Excel workbook** (shift reports,
-trucks, production, stock register, pricing) plus single CSVs.
-
-People may hold several roles; a manager can do everything. Nav shows only the current role's
-screens. The security gate is off-app (paper register).
+- Trucks: weigh loaded → count/sample boxes → weigh empty → confirm received.
+- Day shifts start at 08:00; night shifts at 20:00. After midnight a night shift uses
+  the previous local date. Plant devices should use the plant's local timezone.
+- Opening balance carries from the previous closed shift. Infeed balance is opening
+  + received truck net weight − fed weight.
+- Feeds are numbered per shift. Outputs attach to the latest feed and appear in Stock.
+  Yield is calculated by `lib/yield.ts`; shift totals combine all feeds and outputs.
+- Closing creates an unverified frozen report. QC/manager verifies it separately.
+- Dashboard exports five styled Excel sheets, loaded lazily, and UTF-8 BOM CSV files.
+  Date ranges use shift business dates for production/stock/reports and entry dates
+  for trucks/pricing. Workbook production yields are indicative per feed; official
+  shift yields are in Shift Reports.
 
 ## Offline capture
 
-Weighbridge, Receiving and Production writes go through a Dexie-backed queue keyed by a client
-uuid. When offline they're saved locally and replayed on reconnect using **upsert on the row id**,
-so a reconnect never creates duplicates. The header shows an offline / syncing chip with the
-pending count.
+Truck, feed, and output writes are durably queued in Dexie before sending. Inserts
+upsert on their client UUID. An ordered single drain retries on startup, reconnect,
+and every 20 seconds. Network failures remain queued; other failures are removed
+and shown to the operator. Pending rows overlay cached reads, so locally captured
+feeds can receive output and truck steps can advance while offline. Cached reads
+and new mutations belong to the signed-in staff member; another login cannot send
+their queued writes. Sign back in as the original person to send their records.
 
-## Acceptance checks baked in
+The offline shell and cached records require a prior online visit/sign-in. Starting
+and ending shifts require a connection. Sync saved records on **all devices** before
+ending a shift.
 
-- One open shift at a time; opening balance = prior shift closing.
-- Register no captured per GRN with a soft duplicate-per-day warning.
-- gross 24860 / tare 8940 → net 15920; sample 30 boxes / 300 kg → estimate shown; >5% flags.
-- Closing a shift freezes a report; later edits don't change it.
-- Rate invisible to every non-manager, including via raw query to `grn_pricing`.
-- A GRN or output on one device updates the manager dashboard without refresh (Realtime).
-- Offline capture syncs on reconnect with no duplicates.
-- Continuous multi-day runs work by chaining shifts with balances carried through.
+## Existing-schema constraints
+
+No database changes are made by this application update. The supplied schema has
+no transactional shift-closing RPC. The report is inserted first, then the shift is
+closed. If closing fails, retry reuses the original report and its balance, without
+recalculating or overwriting it. Concurrent captures on another device during close
+cannot be atomically excluded with this schema. Coordinate shift handover on the floor.
+
+The existing RLS allows QC/managers to update report rows; the UI updates only
+`verified_by`. Database-level immutability against direct API writes would require
+separate, explicitly approved policy/trigger changes. Similarly, concurrent operators
+can choose the same feed number because the supplied schema has no per-shift sequence
+or uniqueness constraint. Row UUIDs remain unique.
+
+The supplied Realtime publication excludes `grn_pricing`; the dashboard listens for
+it and also refreshes periodically, so pricing still updates without a page reload.
+
+## Tests
+
+- `npm test`: arithmetic, midnight dates, CSV escaping, pagination, offline replay,
+  generated-column exclusion, shared-device ownership, and stale-read refusal.
+- `npm run test:e2e`: Chrome locally / Playwright Chromium in CI; mocked Supabase
+  only, never real PINs or live writes. Covers truck steps, feed/output/stock,
+  close retry and frozen report, QC verification, offline retry, role routing,
+  five-sheet Excel contents, and phone layout.
+- `npm run build`: type-check and production/PWA build.
+
+GitHub Actions runs checks on feature branches and pull requests. Local browser
+execution may need an environment that permits launching Chrome.
+
+## GitHub Pages
+
+`.github/workflows/deploy.yml` deploys pushes to `main`. Repository secrets:
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Pages source must be GitHub Actions.
+The Vite base is `/bristol-production-ledger/` in Actions and `/` locally; the deploy
+workflow copies `index.html` to `404.html` for direct route loads.
+
+## Vercel
+
+Import this repository with the Vite preset. Build command: `npm run build`;
+output directory: `dist`. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+for Production and Preview using the active existing Supabase project's URL and
+publishable key. Rebuild after environment changes. Never upload a service-role key.
+
+`vercel.json` sends direct routes such as `/trucks` and `/reports` to the app shell.
+Vercel builds use `/` as the base; GitHub Pages retains its repository subpath.
+Supabase remains the database and authentication backend; deployment does not
+copy, reset, or migrate its tables. Existing sessions are origin-specific, so staff
+will sign in again on the new Vercel domain.

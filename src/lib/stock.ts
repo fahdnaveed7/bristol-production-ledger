@@ -1,3 +1,4 @@
+import { readAll } from './read'
 import { supabase } from './supabase'
 import { outputKg } from './yield'
 import type { Product } from './types'
@@ -24,14 +25,14 @@ interface OutputRow {
 
 // Everything ever produced, grouped by production date + shift.
 export async function fetchStock(): Promise<{ days: StockDay[]; totals: StockDay }> {
-  const { data, error } = await supabase
+  const { data } = await readAll(supabase
     .from('batch_output')
     .select('product,bags,kg_per_bag,total_kg,created_at,batch:batch_id(shift:shift_id(business_date,label))')
-    .order('created_at', { ascending: false })
-  if (error) throw error
+    .order('created_at', { ascending: false }))
 
   const map = new Map<string, StockDay>()
   for (const raw of (data ?? []) as unknown as OutputRow[]) {
+    if (raw.product !== 'fishmeal' && raw.product !== 'fishoil') continue
     const date = raw.batch?.shift?.business_date ?? raw.created_at?.slice(0, 10) ?? '—'
     const label = raw.batch?.shift?.label ?? ''
     const key = `${date}|${label}`
